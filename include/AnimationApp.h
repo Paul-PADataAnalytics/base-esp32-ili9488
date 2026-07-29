@@ -4,10 +4,14 @@
 #include "BaseApp.h"
 #include "GFXContext.h"
 #include "SleepManager.h"
+#include "SampleIcons.h"
 #include <Arduino.h>
 
+// RTC memory variable that survives Deep Sleep reboots!
+RTC_DATA_ATTR static int rtcWakeupCount = 0;
+
 /**
- * Interactive 3D Cube & Bouncing Spheres Demo with Touch Control & Sleep Module
+ * Interactive 3D Cube & Bouncing Spheres Demo with Sleep Mode Choice & Image Loading
  */
 class AnimationApp : public BaseApp {
 
@@ -69,17 +73,21 @@ public:
         : _angleX(0), _angleY(0), _angleZ(0),
           _touched(false), _touchX(0), _touchY(0),
           _lastTouchX(0), _lastTouchY(0),
-          _sleepManager(20) {} // Auto-sleep after 20 seconds of inactivity
+          _sleepManager(15, SleepMode::DEEP_SLEEP) {} // Choice: DEEP_SLEEP after 15s inactivity
 
     void setup(GFXContext& gfx) override {
         // Register Developer Pre-Sleep & Post-Wake Callbacks
         _sleepManager.onPreSleep([this]() {
-            Serial.println("[APP CALLBACK] Application saving state & pausing animations before sleep...");
+            Serial.println("[APP CALLBACK] Application saving state & pausing before sleep...");
         });
 
         _sleepManager.onPostWake([this]() {
-            Serial.println("[APP CALLBACK] Application restored state & resumed animations after wake!");
+            rtcWakeupCount++;
+            Serial.printf("[APP CALLBACK] Application restored state after wake! Total Wakeups: %d\n", rtcWakeupCount);
         });
+
+        // Assistant check for Deep Sleep reboot wakeup
+        _sleepManager.checkAndNotifyDeepSleepWakeup();
 
         uint16_t colors[4] = {
             gfx.color565(0, 255, 255),
@@ -127,7 +135,7 @@ public:
     void render(GFXContext& gfx) override {
         uint16_t spaceColor = gfx.color565(8, 19, 19);
 
-        // Check Touch Input & Reset Sleep Timer
+        // Touch Input & Inactivity Reset
         _touched = gfx.getTouch(&_touchX, &_touchY);
         if (_touched) {
             _sleepManager.resetInactivityTimer();
@@ -146,9 +154,9 @@ public:
             _lastTouchY = 0;
         }
 
-        // Check Auto-Sleep Timeout
+        // Check Auto-Sleep Trigger
         if (_sleepManager.shouldAutoSleep()) {
-            _sleepManager.enterLightSleep(gfx);
+            _sleepManager.triggerSleep(gfx);
             return;
         }
 
@@ -164,7 +172,7 @@ public:
             }
         }
 
-        // 2. Render 3D Cube inside Sprite Buffer
+        // 2. Render 3D Cube & Image Bitmap Asset inside Sprite Buffer
         gfx.clearBuffer(spaceColor);
 
         int spriteSize = gfx.getSpriteW();
@@ -185,6 +193,9 @@ public:
             gfx.drawCircleBuffer(projX[p1], projY[p1], 3, 0xFFE0, true);
         }
 
+        // Render transparent 16x16 bitmap icon at center of cube sprite!
+        gfx.pushImageTransparent(spriteSize / 2 - 8, spriteSize / 2 - 8, 16, 16, ICON_POWER_16x16, 0x0000);
+
         for (int i = 0; i < 4; i++) {
             if (gfx.overlapsBuffer(_balls[i].x, _balls[i].y, _balls[i].radius)) {
                 int localX = (int)(_balls[i].x - gfx.getSpriteX());
@@ -198,14 +209,21 @@ public:
 
         gfx.pushBuffer();
 
-        // 3. UI Header Text & Sleep Countdown
-        gfx.drawTextDirect("HAL Framework v1.1", 15, 10, gfx.color565(0, 255, 255), 2);
+        // 3. UI Header Text, Gradient & Sleep Mode Info
+        gfx.drawGradientRectDirect(0, 0, 480, 32, gfx.color565(15, 30, 60), gfx.color565(8, 19, 19), true);
+        gfx.drawTextDirect("HAL Framework v1.2", 15, 8, gfx.color565(0, 255, 255), 2);
         gfx.drawRectDirect(gfx.getSpriteX() - 1, gfx.getSpriteY() - 1, gfx.getSpriteW() + 2, gfx.getSpriteH() + 2, 0xFFFF);
 
         uint32_t secRemaining = _sleepManager.getInactivitySecondsRemaining();
-        char sleepBuf[24];
-        snprintf(sleepBuf, sizeof(sleepBuf), "Sleep: %lds ", (long)secRemaining);
-        gfx.drawTextDirect(sleepBuf, 320, 10, gfx.color565(255, 165, 0), 2);
+        char sleepBuf[32];
+        snprintf(sleepBuf, sizeof(sleepBuf), "DeepSleep: %lds ", (long)secRemaining);
+        gfx.drawTextDirect(sleepBuf, 290, 8, gfx.color565(255, 165, 0), 2);
+
+        if (rtcWakeupCount > 0) {
+            char wakeBuf[32];
+            snprintf(wakeBuf, sizeof(wakeBuf), "Wakes: %d", rtcWakeupCount);
+            gfx.drawTextDirect(wakeBuf, 15, 295, gfx.color565(0, 255, 120), 2);
+        }
     }
 };
 

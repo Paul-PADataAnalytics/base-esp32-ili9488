@@ -1,70 +1,67 @@
-# 💤 ESP32 & Display Sleep Manager Module (v1.1)
+# 💤 ESP32 & Display Sleep Manager Module (v1.2)
 
-The **`SleepManager`** module encapsulates low-power Light Sleep, display driver power-down, inactivity timers, and developer lifecycle callbacks.
-
----
-
-## 🛠️ Key Features for Downstream Developers
-
-1. **Pre-Sleep & Post-Wake Callbacks**:
-   - `onPreSleep(callback)`: Executed automatically before the display and ESP32 enter sleep mode. Allows downstream applications to save game state, close open network connections, or write data to flash.
-   - `onPostWake(callback)`: Executed automatically after the display wakes up and the backlight turns back on. Allows applications to reload state or resume audio/animations.
-
-2. **Automated Inactivity Timeout**:
-   - Automatically tracks user touch input. If no touch activity occurs for $N$ seconds, the unit automatically powers down hardware and enters low-power Light Sleep.
-
-3. **Touch & Timer Wake-up**:
-   - **Touch Wakeup**: Wakes up instantly when the user touches the screen (`GPIO 36` / `PEN` interrupt).
-   - **Timer Wakeup**: Optional auto-wake after $S$ seconds.
+The **`SleepManager`** module provides developer choice between **Light Sleep** and **Deep Sleep** modes, complete with low-power hardware shutoff, inactivity timers, touch screen wake-up, and Deep Sleep reboot state-restoration assistance.
 
 ---
 
-## 💻 Developer Code Example
+## 🛠️ Sleep Mode Choice: Light Sleep vs Deep Sleep
+
+| Feature | `SleepMode::LIGHT_SLEEP` | `SleepMode::DEEP_SLEEP` |
+|---|---|---|
+| **Power Consumption** | ~0.8 mA - 2 mA | **Ultra-Low Power (~10 µA)** |
+| **RAM State** | Retained in SRAM | Reboots system (Restored via `RTC_DATA_ATTR`) |
+| **Wake-up Speed** | Instant resumption after line of code | Fast reboot with `onPostWake()` assistance |
+| **Backlight State** | 100% OFF (RTC Hold on GPIO 32) | 100% OFF (RTC Hold on GPIO 32) |
+| **Wakeup Source** | Touch `GPIO 36` (PEN) or Timer | Touch `GPIO 36` (PEN) or Timer |
+
+---
+
+## 💻 Developer Code Example with Deep Sleep Assistance
 
 ```cpp
 #include "SleepManager.h"
 
-SleepManager sleepManager(30); // 30-second auto-sleep timeout
+// Variable stored in RTC Fast Memory that survives Deep Sleep reboots!
+RTC_DATA_ATTR static int rtcWakeupCount = 0;
+
+// Choice: Deep Sleep after 20 seconds of user inactivity
+SleepManager sleepManager(20, SleepMode::DEEP_SLEEP);
 
 void setupApp(GFXContext& gfx) {
-    // Register Pre-Sleep Callback (Save state)
+    // Register Pre-Sleep Callback (Save state to NVS or RTC memory)
     sleepManager.onPreSleep([]() {
-        Serial.println("Saving game state before display turns off...");
+        Serial.println("Saving app state before Deep Sleep power down...");
     });
 
-    // Register Post-Wake Callback (Resume state)
+    // Register Post-Wake Callback (Restores app state)
     sleepManager.onPostWake([]() {
-        Serial.println("Resuming game state after display wake up!");
+        rtcWakeupCount++;
+        Serial.printf("Restored state after Deep Sleep! Wakeup Count: %d\n", rtcWakeupCount);
     });
+
+    // ASSISTANT: Automatically checks if system just rebooted from Deep Sleep
+    // and triggers onPostWake() callback if true!
+    sleepManager.checkAndNotifyDeepSleepWakeup();
 }
 
 void renderApp(GFXContext& gfx) {
     int x, y;
     if (gfx.getTouch(&x, &y)) {
-        // Touch activity resets the inactivity sleep timer automatically
+        // Touch activity resets inactivity timer
         sleepManager.resetInactivityTimer();
     }
 
-    // Trigger auto-sleep when inactivity timeout elapses
+    // Triggers configured sleep mode (Light or Deep)
     if (sleepManager.shouldAutoSleep()) {
-        sleepManager.enterLightSleep(gfx);
+        sleepManager.triggerSleep(gfx);
     }
 }
 ```
 
 ---
 
-## ⚡ Hardware Power-Down Sequence
+## 🔍 Deep Sleep Assistance API
 
-During `enterLightSleep()`:
-1. Calls developer `onPreSleep()` callback.
-2. Turns OFF LED Backlight (`GPIO 32` LOW).
-3. Sends `SLPIN` (0x10) command to ILI9488 display driver.
-4. Configures ESP32 `ext0` / GPIO wakeup on `GPIO 36` (`PEN` pin).
-5. Enters ESP32 Light Sleep mode.
-
-During Wakeup:
-1. Sends `SLPOUT` (0x11) command to ILI9488 display driver.
-2. Turns ON LED Backlight (`GPIO 32` HIGH).
-3. Resets inactivity timer.
-4. Calls developer `onPostWake()` callback.
+- `bool SleepManager::wasWokenFromDeepSleep()`: Returns `true` if the ESP32 booted due to a touch or timer wakeup.
+- `esp_sleep_wakeup_cause_t SleepManager::getWakeupCause()`: Returns the exact wakeup reason (`ESP_SLEEP_WAKEUP_EXT0` for Touch).
+- `void sleepManager.checkAndNotifyDeepSleepWakeup()`: Assistant method to place in `setup()` that automatically invokes `onPostWake()` after a Deep Sleep reboot.
