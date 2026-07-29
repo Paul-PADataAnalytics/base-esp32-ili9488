@@ -7,10 +7,10 @@ LGFX_ILI9488::LGFX_ILI9488() {
         cfg.spi_mode   = 0;
         cfg.freq_write = 27000000;    // 27 MHz SPI write speed
         cfg.freq_read  = 16000000;
-        cfg.pin_sclk   = 18;          // Shared SCK (LCD CLK & Touch TCK)
-        cfg.pin_mosi   = 23;          // Shared MOSI (LCD SDI & Touch TDI)
-        cfg.pin_miso   = 19;          // Shared MISO (LCD SDO & Touch TDO)
-        cfg.pin_dc     = 27;          // LCD DC pin
+        cfg.pin_sclk   = 18;          // SCK pin
+        cfg.pin_mosi   = 23;          // MOSI pin
+        cfg.pin_miso   = 19;          // MISO pin
+        cfg.pin_dc     = 27;          // DC pin
         _bus_instance.config(cfg);
         _panel_instance.setBus(&_bus_instance);
     }
@@ -34,21 +34,16 @@ LGFX_ILI9488::LGFX_ILI9488() {
         _panel_instance.config(cfg);
     }
 
-    { // Touch Controller Configuration (XPT2046)
+    { // Touch Controller Configuration (XPT2046 on Shared Bus)
         auto cfg = _touch_instance.config();
         cfg.x_min      = 300;
         cfg.x_max      = 3900;
         cfg.y_min      = 200;
         cfg.y_max      = 3700;
         cfg.pin_cs     = 33;          // TCS -> GPIO 33
-        cfg.pin_int    = 36;          // PEN -> GPIO 36 (Interrupt)
-        cfg.bus_shared = true;        // Shared VSPI bus with LCD
-        cfg.offset_rotation = 0;
-        cfg.spi_host   = VSPI_HOST;
-        cfg.freq       = 2500000;     // 2.5 MHz Touch SPI frequency
-        cfg.pin_sclk   = 18;          // TCK -> GPIO 18 (Shared SCK)
-        cfg.pin_mosi   = 23;          // TDI -> GPIO 23 (Shared MOSI)
-        cfg.pin_miso   = 19;          // TDO -> GPIO 19 (Shared MISO)
+        cfg.spi_host   = VSPI_HOST;   // Target VSPI_HOST explicitly
+        cfg.bus_shared = true;        // Inherits SPI bus from panel (VSPI_HOST)
+        cfg.freq       = 1000000;     // 1 MHz Touch SPI frequency
         _touch_instance.config(cfg);
         _panel_instance.setTouch(&_touch_instance);
     }
