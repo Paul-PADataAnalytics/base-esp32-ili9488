@@ -16,8 +16,13 @@ This document defines the complete hardware pin mapping for connecting an **ESP3
 | **DC / RS** | **GPIO 27** | Data / Command Selection | Output |
 | **SDI (MOSI)** | **GPIO 23** | SPI Master Out Slave In | Shared SPI Output |
 | **SCK (CLK)** | **GPIO 18** | SPI Bus Serial Clock | Shared SPI Clock |
-| **LED** | **GPIO 32** | Display Backlight Power (High = On) | Output |
+| **LED** | **GPIO 32** | Display Backlight Control (High = On, Low = Sleep Off) | Output |
 | **SDO (MISO)** | **GPIO 19** | SPI Master In Slave Out | Shared SPI Input |
+
+> [!IMPORTANT]
+> **Backlight Sleep Control Wiring**:
+> - If the **LED** pin on the LCD module is wired directly to the constant **`3.3V`** power rail, the backlight will remain physically powered ON even when the ESP32 enters low-power sleep mode.
+> - **To allow software to turn off the backlight during sleep**, connect the display **`LED`** pin to **`GPIO 32`**. The `SleepManager` module automatically applies an RTC GPIO hold on `GPIO 32` to keep the backlight 100% OFF during sleep.
 
 ### 2. Touch Screen Controller (XPT2046)
 | Touch Pin Label | ESP32 GPIO Pin | Connection Strategy | Signal Type |
@@ -59,7 +64,7 @@ This document defines the complete hardware pin mapping for connecting an **ESP3
  │            GPIO 5 ├────────────────────►│ CS (LCD)           │
  │            GPIO 4 ├────────────────────►│ RESET              │
  │           GPIO 27 ├────────────────────►│ DC / RS            │
- │           GPIO 32 ├────────────────────►│ LED (Backlight)    │
+ │           GPIO 32 ├────────────────────►│ LED (Backlight)    │◄── Move LED from 3.3V to GPIO 32 for Sleep Shutoff!
  │           GPIO 33 ├────────────────────►│ TCS (Touch CS)     │
  │           GPIO 36 ├◄───────────────────┤ PEN (Touch IRQ)    │
  │                   │                     │                    │

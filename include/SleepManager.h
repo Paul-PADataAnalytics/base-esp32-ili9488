@@ -3,14 +3,15 @@
 
 #include <Arduino.h>
 #include <esp_sleep.h>
+#include <driver/gpio.h>
 #include <functional>
 #include "GFXContext.h"
 
 /**
  * SleepManager - ESP32 & Display Power/Sleep Management Module
  * 
- * Provides automated inactivity sleep timers, manual sleep triggers,
- * pre-sleep & post-wake developer callbacks, and hardware power-down routines.
+ * Configures GPIO 32 RTC pin hold to guarantee the display backlight turns off
+ * 100% completely during Light Sleep when LED is connected to GPIO 32.
  */
 class SleepManager {
 public:
@@ -38,7 +39,6 @@ public:
     void onPreSleep(SleepCallback cb) { _preSleepCallback = cb; }
     void onPostWake(SleepCallback cb) { _postWakeCallback = cb; }
 
-    // Register user activity (e.g. touch input) to reset inactivity timer
     void resetInactivityTimer() {
         _lastActivityTime = millis();
     }
@@ -59,7 +59,6 @@ public:
         return (_inactivityTimeoutMs - elapsed) / 1000;
     }
 
-    // Check if auto-sleep timeout has elapsed
     bool shouldAutoSleep() const {
         if (!_autoSleepEnabled || _isSleeping) return false;
         return (millis() - _lastActivityTime >= _inactivityTimeoutMs);
@@ -76,24 +75,28 @@ public:
             _preSleepCallback();
         }
 
-        // 2. Hardware Power-Down
+        // 2. Turn OFF Backlight & Hold GPIO 32 LOW during sleep
         gfx.turnOffBacklight();
+        gpio_hold_en((gpio_num_t)32);
+        gpio_deep_sleep_hold_en();
+
+        // 3. Put display controller to sleep
         gfx.sleepDisplay();
 
         _isSleeping = true;
-        Serial.println("[SLEEP MANAGER] Display powered down. ESP32 entering Light Sleep.");
+        Serial.println("[SLEEP MANAGER] Backlight OFF (GPIO 32 LOW Hold). ESP32 entering Light Sleep.");
         Serial.flush();
 
-        // 3. Configure Wakeup Sources
+        // 4. Configure Wakeup Sources
         if (sleepSeconds > 0) {
             esp_sleep_enable_timer_wakeup((uint64_t)sleepSeconds * 1000000ULL);
         }
         
-        // Enable Touch Screen Wakeup (GPIO 36 / PEN Interrupt active LOW)
+        // Touch Screen Wakeup (GPIO 36 / PEN Interrupt active LOW)
         gpio_wakeup_enable((gpio_num_t)36, GPIO_INTR_LOW_LEVEL);
         esp_sleep_enable_gpio_wakeup();
 
-        // 4. Enter ESP32 Light Sleep
+        // 5. Enter ESP32 Light Sleep
         esp_light_sleep_start();
 
         // --- WAKE UP ROUTINE ---
@@ -102,11 +105,12 @@ public:
 
         Serial.println("\n[SLEEP MANAGER] Waking up hardware...");
 
-        // 5. Restore Hardware Power
+        // 6. Release GPIO hold & turn ON Backlight
+        gpio_hold_dis((gpio_num_t)32);
         gfx.wakeDisplay();
         gfx.turnOnBacklight();
 
-        // 6. Invoke developer post-wake callback
+        // 7. Invoke developer post-wake callback
         if (_postWakeCallback) {
             _postWakeCallback();
         }
