@@ -3,12 +3,11 @@
 
 #include "BaseApp.h"
 #include "GFXContext.h"
+#include "SleepManager.h"
 #include <Arduino.h>
 
 /**
- * Interactive 3D Cube & Bouncing Spheres Demo with Touch Control
- * 
- * Demonstrates touch screen handling abstracted through GFXContext.
+ * Interactive 3D Cube & Bouncing Spheres Demo with Touch Control & Sleep Module
  */
 class AnimationApp : public BaseApp {
 
@@ -43,6 +42,8 @@ private:
     int  _touchX, _touchY;
     int  _lastTouchX, _lastTouchY;
 
+    SleepManager _sleepManager;
+
     void project(Point3D p, int &screenX, int &screenY, int spriteSize) {
         float radX = _angleX * DEG_TO_RAD;
         float y1 = p.y * cos(radX) - p.z * sin(radX);
@@ -67,9 +68,19 @@ public:
     AnimationApp() 
         : _angleX(0), _angleY(0), _angleZ(0),
           _touched(false), _touchX(0), _touchY(0),
-          _lastTouchX(0), _lastTouchY(0) {}
+          _lastTouchX(0), _lastTouchY(0),
+          _sleepManager(20) {} // Auto-sleep after 20 seconds of inactivity
 
     void setup(GFXContext& gfx) override {
+        // Register Developer Pre-Sleep & Post-Wake Callbacks
+        _sleepManager.onPreSleep([this]() {
+            Serial.println("[APP CALLBACK] Application saving state & pausing animations before sleep...");
+        });
+
+        _sleepManager.onPostWake([this]() {
+            Serial.println("[APP CALLBACK] Application restored state & resumed animations after wake!");
+        });
+
         uint16_t colors[4] = {
             gfx.color565(0, 255, 255),
             gfx.color565(255, 255, 0),
@@ -86,10 +97,11 @@ public:
             _balls[i].oldX = _balls[i].x;
             _balls[i].oldY = _balls[i].y;
         }
+
+        _sleepManager.resetInactivityTimer();
     }
 
     void update(float deltaTime) override {
-        // Touch Input Update is handled via render pass using GFXContext
         if (!_touched) {
             _angleX += 140.0f * deltaTime;
             _angleY += 180.0f * deltaTime;
@@ -115,10 +127,11 @@ public:
     void render(GFXContext& gfx) override {
         uint16_t spaceColor = gfx.color565(8, 19, 19);
 
-        // Check Touch Screen Input
+        // Check Touch Input & Reset Sleep Timer
         _touched = gfx.getTouch(&_touchX, &_touchY);
         if (_touched) {
-            // Interactive rotation via touch drag
+            _sleepManager.resetInactivityTimer();
+
             if (_lastTouchX > 0 && _lastTouchY > 0) {
                 _angleY += (_touchX - _lastTouchX) * 1.5f;
                 _angleX += (_touchY - _lastTouchY) * 1.5f;
@@ -126,7 +139,6 @@ public:
             _lastTouchX = _touchX;
             _lastTouchY = _touchY;
 
-            // Reposition nearest ball to touch location
             _balls[0].x = _touchX;
             _balls[0].y = _touchY;
         } else {
@@ -134,7 +146,13 @@ public:
             _lastTouchY = 0;
         }
 
-        // 1. Erase & Draw Spheres outside sprite area
+        // Check Auto-Sleep Timeout
+        if (_sleepManager.shouldAutoSleep()) {
+            _sleepManager.enterLightSleep(gfx);
+            return;
+        }
+
+        // 1. Erase & Draw Spheres
         for (int i = 0; i < 4; i++) {
             if (!gfx.overlapsBuffer(_balls[i].oldX, _balls[i].oldY, _balls[i].radius)) {
                 gfx.eraseCircleDirect((int)_balls[i].oldX, (int)_balls[i].oldY, (int)_balls[i].radius, spaceColor);
@@ -146,7 +164,7 @@ public:
             }
         }
 
-        // 2. Render 3D Cube & Overlapping Spheres inside Off-Screen Sprite Buffer
+        // 2. Render 3D Cube inside Sprite Buffer
         gfx.clearBuffer(spaceColor);
 
         int spriteSize = gfx.getSpriteW();
@@ -178,22 +196,16 @@ public:
             }
         }
 
-        // Push off-screen sprite buffer to LCD via SPI DMA
         gfx.pushBuffer();
 
-        // 3. UI Header Text & Touch Coordinates
-        gfx.drawTextDirect("Touch & Display HAL Engine", 15, 10, gfx.color565(0, 255, 255), 2);
+        // 3. UI Header Text & Sleep Countdown
+        gfx.drawTextDirect("HAL Framework v1.1", 15, 10, gfx.color565(0, 255, 255), 2);
         gfx.drawRectDirect(gfx.getSpriteX() - 1, gfx.getSpriteY() - 1, gfx.getSpriteW() + 2, gfx.getSpriteH() + 2, 0xFFFF);
 
-        if (_touched) {
-            char touchBuf[32];
-            snprintf(touchBuf, sizeof(touchBuf), "Touch: %d,%d  ", _touchX, _touchY);
-            gfx.drawTextDirect(touchBuf, 320, 10, gfx.color565(255, 255, 0), 2);
-        } else {
-            char fpsBuf[16];
-            snprintf(fpsBuf, sizeof(fpsBuf), "FPS: %.1f ", gfx.getFPS());
-            gfx.drawTextDirect(fpsBuf, 340, 10, gfx.color565(0, 255, 120), 2);
-        }
+        uint32_t secRemaining = _sleepManager.getInactivitySecondsRemaining();
+        char sleepBuf[24];
+        snprintf(sleepBuf, sizeof(sleepBuf), "Sleep: %lds ", (long)secRemaining);
+        gfx.drawTextDirect(sleepBuf, 320, 10, gfx.color565(255, 165, 0), 2);
     }
 };
 

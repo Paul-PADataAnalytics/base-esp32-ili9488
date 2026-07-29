@@ -5,10 +5,10 @@
 #include <LovyanGFX.hpp>
 
 /**
- * GFXContext - Hardware Abstraction Layer Drawing & Input API
+ * GFXContext - Hardware Abstraction Layer Drawing, Input & Power API
  * 
  * Provides high-level drawing, color math, sprite double-buffering,
- * touch screen input, and FPS metrics while hiding low-level hardware.
+ * touch screen input, power/sleep control, and FPS metrics.
  */
 class GFXContext {
 private:
@@ -35,8 +35,24 @@ public:
     int getSpriteW() const { return _spriteW; }
     int getSpriteH() const { return _spriteH; }
 
+    // --- Display Power & Backlight Control ---
+    void turnOnBacklight() {
+        digitalWrite(32, HIGH);
+    }
+
+    void turnOffBacklight() {
+        digitalWrite(32, LOW);
+    }
+
+    void sleepDisplay() {
+        _lcd->sleep();
+    }
+
+    void wakeDisplay() {
+        _lcd->wakeup();
+    }
+
     // --- Touch Screen API ---
-    // Returns true if touched, populating x and y with touch coordinates
     bool getTouch(int* x, int* y) {
         return _lcd->getTouch(x, y);
     }
