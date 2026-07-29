@@ -1,8 +1,5 @@
 /**
  * ESP32 Hardware-Abstracted Application Framework Main Entry
- * 
- * Hardware control is isolated inside this entry point and GFXContext.
- * User application code (AnimationApp) contains ZERO hardware registers or SPI logic.
  */
 
 #include <Arduino.h>
@@ -28,12 +25,12 @@ unsigned long lastFPSTime   = 0;
 int           frameCount    = 0;
 
 void setup() {
-    // 1. Deselect Touch CS (GPIO 33) & Turn On Backlight (GPIO 32)
-    pinMode(33, OUTPUT);
-    digitalWrite(33, HIGH); // Pull TCS HIGH (deselected) so LCD SPI init is 100% clean
-
+    // 1. Force Backlight Pin HIGH (GPIO 32) & Deselect Touch CS (GPIO 33)
     pinMode(32, OUTPUT);
-    digitalWrite(32, HIGH); // Backlight HIGH
+    digitalWrite(32, HIGH); // Backlight HIGH (Turn on LED)
+
+    pinMode(33, OUTPUT);
+    digitalWrite(33, HIGH); // Pull TCS HIGH (deselected)
 
     Serial.begin(115200);
     delay(300);
@@ -41,7 +38,6 @@ void setup() {
 
     // 2. Initialize Display Driver
     tft.init();
-    tft.setBrightness(255);
     tft.setRotation(1); // Landscape mode (480x320)
     tft.fillScreen(gfx.color565(8, 19, 19));
 

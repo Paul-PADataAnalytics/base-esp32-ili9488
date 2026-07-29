@@ -48,15 +48,5 @@ LGFX_ILI9488::LGFX_ILI9488() {
         _panel_instance.setTouch(&_touch_instance);
     }
 
-    { // Backlight Configuration
-        auto cfg = _light_instance.config();
-        cfg.pin_bl      = 32;         // LED Backlight pin
-        cfg.invert      = false;
-        cfg.freq        = 44100;
-        cfg.pwm_channel = 7;
-        _light_instance.config(cfg);
-        _panel_instance.setLight(&_light_instance);
-    }
-
     setPanel(&_panel_instance);
 }
