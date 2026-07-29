@@ -6,10 +6,9 @@
 #include <Arduino.h>
 
 /**
- * 3D Rotating Cube & Bouncing Spheres Demo Application
+ * Interactive 3D Cube & Bouncing Spheres Demo with Touch Control
  * 
- * Contains ZERO hardware registers or SPI driver code.
- * Implements BaseApp lifecycle interface (setup, update, render).
+ * Demonstrates touch screen handling abstracted through GFXContext.
  */
 class AnimationApp : public BaseApp {
 
@@ -40,6 +39,10 @@ private:
     Ball _balls[4];
     float _angleX, _angleY, _angleZ;
 
+    bool _touched;
+    int  _touchX, _touchY;
+    int  _lastTouchX, _lastTouchY;
+
     void project(Point3D p, int &screenX, int &screenY, int spriteSize) {
         float radX = _angleX * DEG_TO_RAD;
         float y1 = p.y * cos(radX) - p.z * sin(radX);
@@ -61,7 +64,10 @@ private:
     }
 
 public:
-    AnimationApp() : _angleX(0), _angleY(0), _angleZ(0) {}
+    AnimationApp() 
+        : _angleX(0), _angleY(0), _angleZ(0),
+          _touched(false), _touchX(0), _touchY(0),
+          _lastTouchX(0), _lastTouchY(0) {}
 
     void setup(GFXContext& gfx) override {
         uint16_t colors[4] = {
@@ -83,9 +89,12 @@ public:
     }
 
     void update(float deltaTime) override {
-        _angleX += 140.0f * deltaTime;
-        _angleY += 180.0f * deltaTime;
-        _angleZ += 90.0f * deltaTime;
+        // Touch Input Update is handled via render pass using GFXContext
+        if (!_touched) {
+            _angleX += 140.0f * deltaTime;
+            _angleY += 180.0f * deltaTime;
+            _angleZ += 90.0f * deltaTime;
+        }
 
         for (int i = 0; i < 4; i++) {
             _balls[i].oldX = _balls[i].x;
@@ -105,6 +114,25 @@ public:
 
     void render(GFXContext& gfx) override {
         uint16_t spaceColor = gfx.color565(8, 19, 19);
+
+        // Check Touch Screen Input
+        _touched = gfx.getTouch(&_touchX, &_touchY);
+        if (_touched) {
+            // Interactive rotation via touch drag
+            if (_lastTouchX > 0 && _lastTouchY > 0) {
+                _angleY += (_touchX - _lastTouchX) * 1.5f;
+                _angleX += (_touchY - _lastTouchY) * 1.5f;
+            }
+            _lastTouchX = _touchX;
+            _lastTouchY = _touchY;
+
+            // Reposition nearest ball to touch location
+            _balls[0].x = _touchX;
+            _balls[0].y = _touchY;
+        } else {
+            _lastTouchX = 0;
+            _lastTouchY = 0;
+        }
 
         // 1. Erase & Draw Spheres outside sprite area
         for (int i = 0; i < 4; i++) {
@@ -130,7 +158,7 @@ public:
         for (int i = 0; i < 12; i++) {
             int p1 = _cubeEdges[i][0];
             int p2 = _cubeEdges[i][1];
-            uint16_t wireColor = gfx.color565(
+            uint16_t wireColor = _touched ? gfx.color565(255, 120, 0) : gfx.color565(
                 (uint8_t)(128 + 127 * sin(_angleX * DEG_TO_RAD)),
                 (uint8_t)(128 + 127 * sin(_angleY * DEG_TO_RAD + 2.0)),
                 255
@@ -153,13 +181,19 @@ public:
         // Push off-screen sprite buffer to LCD via SPI DMA
         gfx.pushBuffer();
 
-        // 3. UI Header Text & FPS
-        gfx.drawTextDirect("ESP32 Framework App", 15, 10, gfx.color565(0, 255, 255), 2);
+        // 3. UI Header Text & Touch Coordinates
+        gfx.drawTextDirect("Touch & Display HAL Engine", 15, 10, gfx.color565(0, 255, 255), 2);
         gfx.drawRectDirect(gfx.getSpriteX() - 1, gfx.getSpriteY() - 1, gfx.getSpriteW() + 2, gfx.getSpriteH() + 2, 0xFFFF);
 
-        char fpsBuf[16];
-        snprintf(fpsBuf, sizeof(fpsBuf), "FPS: %.1f ", gfx.getFPS());
-        gfx.drawTextDirect(fpsBuf, 340, 10, gfx.color565(0, 255, 120), 2);
+        if (_touched) {
+            char touchBuf[32];
+            snprintf(touchBuf, sizeof(touchBuf), "Touch: %d,%d  ", _touchX, _touchY);
+            gfx.drawTextDirect(touchBuf, 320, 10, gfx.color565(255, 255, 0), 2);
+        } else {
+            char fpsBuf[16];
+            snprintf(fpsBuf, sizeof(fpsBuf), "FPS: %.1f ", gfx.getFPS());
+            gfx.drawTextDirect(fpsBuf, 340, 10, gfx.color565(0, 255, 120), 2);
+        }
     }
 };
 

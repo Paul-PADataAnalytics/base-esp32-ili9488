@@ -5,10 +5,10 @@
 #include <LovyanGFX.hpp>
 
 /**
- * GFXContext - Hardware Abstraction Layer Drawing API
+ * GFXContext - Hardware Abstraction Layer Drawing & Input API
  * 
  * Provides high-level drawing, color math, sprite double-buffering,
- * and FPS metrics while hiding low-level hardware registers.
+ * touch screen input, and FPS metrics while hiding low-level hardware.
  */
 class GFXContext {
 private:
@@ -35,6 +35,18 @@ public:
     int getSpriteW() const { return _spriteW; }
     int getSpriteH() const { return _spriteH; }
 
+    // --- Touch Screen API ---
+    // Returns true if touched, populating x and y with touch coordinates
+    bool getTouch(int* x, int* y) {
+        return _lcd->getTouch(x, y);
+    }
+
+    bool isTouched() {
+        int x, y;
+        return _lcd->getTouch(&x, &y);
+    }
+
+    // --- Drawing API ---
     uint16_t color565(uint8_t r, uint8_t g, uint8_t b) {
         return _lcd->color565(r, g, b);
     }
@@ -65,7 +77,7 @@ public:
 
     void drawTextDirect(const char* text, int x, int y, uint16_t color, uint8_t size = 2) {
         _lcd->setTextColor(color, 0x0813);
-        _driverTextSize(size);
+        _lcd->setTextSize(size);
         _lcd->setCursor(x, y);
         _lcd->print(text);
     }
@@ -85,11 +97,6 @@ public:
 
     void pushBuffer() {
         _sprite->pushSprite(_spriteX, _spriteY);
-    }
-
-private:
-    void _driverTextSize(uint8_t size) {
-        _lcd->setTextSize(size);
     }
 };
 
