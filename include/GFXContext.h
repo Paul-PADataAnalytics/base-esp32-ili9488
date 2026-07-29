@@ -36,6 +36,8 @@ public:
     int getSpriteW() const { return _spriteW; }
     int getSpriteH() const { return _spriteH; }
 
+    LGFX_Sprite* getSprite() { return _sprite; }
+
     // --- Display Power & Backlight Control ---
     void turnOnBacklight() {
         digitalWrite(32, HIGH);
@@ -65,23 +67,14 @@ public:
 
     // --- Image & Bitmap Rendering Primitives ---
 
-    /**
-     * Renders a 16-bit RGB565 bitmap array directly to the display.
-     */
     void pushImageDirect(int x, int y, int w, int h, const uint16_t* data) {
         _lcd->pushImage(x, y, w, h, data);
     }
 
-    /**
-     * Renders a 16-bit RGB565 bitmap array inside the off-screen sprite buffer.
-     */
     void pushImageBuffer(int x, int y, int w, int h, const uint16_t* data) {
         _sprite->pushImage(x, y, w, h, data);
     }
 
-    /**
-     * Renders a bitmap array inside the sprite buffer with a transparent color key.
-     */
     void pushImageTransparent(int x, int y, int w, int h, const uint16_t* data, uint16_t transparentColor) {
         _sprite->pushImage(x, y, w, h, data, transparentColor);
     }
@@ -91,7 +84,6 @@ public:
         return _lcd->color565(r, g, b);
     }
 
-    // Blend two 16-bit RGB565 colors together by ratio (0 = c1, 255 = c2)
     uint16_t blendColor(uint16_t c1, uint16_t c2, uint8_t ratio) {
         uint8_t r1 = (c1 >> 11) & 0x1F;
         uint8_t g1 = (c1 >> 5)  & 0x3F;
@@ -150,7 +142,6 @@ public:
         _lcd->drawTriangle(x1, y1, x2, y2, x3, y3, color);
     }
 
-    // Draw 16-bit RGB gradient rectangle
     void drawGradientRectDirect(int x, int y, int w, int h, uint16_t startColor, uint16_t endColor, bool vertical = true) {
         if (vertical) {
             for (int i = 0; i < h; i++) {
@@ -167,7 +158,6 @@ public:
         }
     }
 
-    // Draw styled UI Button primitive
     void drawButtonDirect(int x, int y, int w, int h, const char* label, uint16_t btnColor, uint16_t txtColor, uint8_t txtSize = 2) {
         _lcd->fillRoundRect(x, y, w, h, 8, btnColor);
         _lcd->drawRoundRect(x, y, w, h, 8, 0xFFFF);
