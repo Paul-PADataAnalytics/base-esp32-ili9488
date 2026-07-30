@@ -2,6 +2,7 @@
 #define UI_MANAGER_H
 
 #include <Arduino.h>
+#include <LovyanGFX.hpp>
 #include "GFXContext.h"
 
 /**
@@ -10,12 +11,14 @@
 struct ToastMessage {
     String message;
     uint16_t color;
-    float duration; // seconds
+    float duration;
     float timer;
 };
 
 /**
  * UIManager - Touch UI Component & Toast Notification Library
+ * 
+ * All UI widgets render directly into the off-screen sprite buffer for 0% flicker.
  */
 class UIManager {
 private:
@@ -42,56 +45,35 @@ public:
         }
     }
 
-    // --- UI Component Primitives ---
+    // --- UI Component Primitives Rendering into Sprite Buffer ---
 
-    // Draw Smooth UI Progress Bar
-    void drawProgressBar(GFXContext& gfx, int x, int y, int w, int h, float progress, uint16_t barColor, uint16_t bgColor = 0x18C3) {
+    void drawProgressBar(LGFX_Sprite* buffer, int x, int y, int w, int h, float progress, uint16_t barColor, uint16_t bgColor = 0x18C3) {
+        if (!buffer) return;
         progress = constrain(progress, 0.0f, 1.0f);
-        gfx.fillRoundRectDirect(x, y, w, h, h / 2, bgColor);
-        gfx.drawRoundRectDirect(x, y, w, h, h / 2, 0xFFFF);
+        buffer->fillRoundRect(x, y, w, h, h / 2, bgColor);
+        buffer->drawRoundRect(x, y, w, h, h / 2, 0xFFFF);
 
         int fillW = (int)((w - 4) * progress);
         if (fillW > 0) {
-            gfx.fillRoundRectDirect(x + 2, y + 2, fillW, h - 4, (h - 4) / 2, barColor);
+            buffer->fillRoundRect(x + 2, y + 2, fillW, h - 4, (h - 4) / 2, barColor);
         }
     }
 
-    // Draw Interactive Touch Toggle Switch
-    bool drawToggleSwitch(GFXContext& gfx, int x, int y, int w, int h, bool state, const char* label) {
-        uint16_t trackColor = state ? gfx.color565(0, 200, 100) : gfx.color565(80, 80, 90);
-        gfx.fillRoundRectDirect(x, y, w, h, h / 2, trackColor);
-        gfx.drawRoundRectDirect(x, y, w, h, h / 2, 0xFFFF);
+    // Render Active Toast Notification into Sprite Buffer
+    void renderToast(LGFX_Sprite* buffer) {
+        if (!_hasToast || !buffer) return;
 
-        int handleX = state ? (x + w - h + 2) : (x + 2);
-        gfx.drawCircleDirect(handleX + (h - 4) / 2, y + h / 2, (h - 4) / 2, 0xFFFF, true);
-
-        if (label) {
-            gfx.drawTextDirect(label, x + w + 10, y + (h - 16) / 2, 0xFFFF, 2);
-        }
-
-        // Check Touch Hit
-        int tx, ty;
-        if (gfx.getTouch(&tx, &ty)) {
-            if (tx >= x && tx <= x + w && ty >= y && ty <= y + h) {
-                return true; // Toggled!
-            }
-        }
-        return false;
-    }
-
-    // Render Active Toast Notification
-    void renderToast(GFXContext& gfx) {
-        if (!_hasToast) return;
-
-        float alpha = _activeToast.timer / _activeToast.duration;
         int toastW = _activeToast.message.length() * 12 + 24;
         int toastH = 34;
-        int toastX = (gfx.getWidth() - toastW) / 2;
+        int toastX = (buffer->width() - toastW) / 2;
         int toastY = 40;
 
-        gfx.fillRoundRectDirect(toastX, toastY, toastW, toastH, 8, gfx.color565(20, 30, 50));
-        gfx.drawRoundRectDirect(toastX, toastY, toastW, toastH, 8, _activeToast.color);
-        gfx.drawTextDirect(_activeToast.message.c_str(), toastX + 12, toastY + 8, _activeToast.color, 2);
+        buffer->fillRoundRect(toastX, toastY, toastW, toastH, 8, 0x11C7);
+        buffer->drawRoundRect(toastX, toastY, toastW, toastH, 8, _activeToast.color);
+        buffer->setTextColor(_activeToast.color, 0x11C7);
+        buffer->setTextSize(2);
+        buffer->setCursor(toastX + 12, toastY + 8);
+        buffer->print(_activeToast.message.c_str());
     }
 };
 

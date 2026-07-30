@@ -9,6 +9,7 @@
  * VirtualGamepad - On-Screen Touch Controller Subsystem for Retro Games
  * 
  * Provides an on-screen D-Pad (Up, Down, Left, Right) and Action Buttons (A, B).
+ * Renders cleanly into the double-buffered sprite to guarantee 0% flicker.
  */
 class VirtualGamepad {
 public:
@@ -66,22 +67,35 @@ public:
     }
 
     /**
-     * Render the on-screen Touch D-Pad and Buttons onto the UI Overlay layer.
+     * Render the on-screen Touch D-Pad and Buttons INTO the sprite buffer (0% Flicker).
      */
-    void render(GFXContext& gfx) {
+    void render(LGFX_Sprite* buffer, uint16_t primaryColor = 0x07FF) {
+        if (!buffer) return;
+
         // D-Pad Cross Background
-        gfx.fillRoundRectDirect(10, 235, 100, 30, 6, _state.left || _state.right ? 0xFFE0 : gfx.color565(40, 50, 70));
-        gfx.fillRoundRectDirect(45, 200, 30, 100, 6, _state.up || _state.down ? 0xFFE0 : gfx.color565(40, 50, 70));
+        uint16_t dpadColor = _state.left || _state.right || _state.up || _state.down ? 0xFFE0 : 0x2A9D;
+        buffer->fillRoundRect(10, 235, 100, 30, 6, dpadColor);
+        buffer->fillRoundRect(45, 200, 30, 100, 6, dpadColor);
+        buffer->drawRoundRect(10, 235, 100, 30, 6, 0xFFFF);
+        buffer->drawRoundRect(45, 200, 30, 100, 6, 0xFFFF);
 
         // Action Button A
-        uint16_t colorA = _state.btnA ? 0x07E0 : gfx.color565(0, 180, 0);
-        gfx.drawCircleDirect(430, 260, 22, colorA, true);
-        gfx.drawTextDirect("A", 423, 252, 0xFFFF, 2);
+        uint16_t colorA = _state.btnA ? 0x07E0 : 0x0400;
+        buffer->fillCircle(430, 260, 22, colorA);
+        buffer->drawCircle(430, 260, 22, 0xFFFF);
+        buffer->setTextColor(0xFFFF, colorA);
+        buffer->setTextSize(2);
+        buffer->setCursor(424, 253);
+        buffer->print("A");
 
         // Action Button B
-        uint16_t colorB = _state.btnB ? 0xF800 : gfx.color565(180, 0, 0);
-        gfx.drawCircleDirect(360, 260, 22, colorB, true);
-        gfx.drawTextDirect("B", 353, 252, 0xFFFF, 2);
+        uint16_t colorB = _state.btnB ? 0xF800 : 0x8000;
+        buffer->fillCircle(360, 260, 22, colorB);
+        buffer->drawCircle(360, 260, 22, 0xFFFF);
+        buffer->setTextColor(0xFFFF, colorB);
+        buffer->setTextSize(2);
+        buffer->setCursor(354, 253);
+        buffer->print("B");
     }
 };
 
