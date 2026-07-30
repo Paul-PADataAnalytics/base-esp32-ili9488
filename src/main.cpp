@@ -36,19 +36,25 @@ void setup() {
     Serial.begin(115200);
     delay(300);
     Serial.println("\n[FRAMEWORK] Initializing Display & Touch HAL Engine...");
+    Serial.printf("[FRAMEWORK MEMORY] Free Heap: %d bytes, Max Alloc: %d bytes\n", ESP.getFreeHeap(), ESP.getMaxAllocHeap());
 
     // 2. Initialize Display Driver
     tft.init();
     tft.setRotation(1); // Landscape mode (480x320)
-    tft.fillScreen(gfx.color565(8, 19, 19));
+    tft.fillScreen(tft.color565(6, 14, 25));
 
-    // Initialize 8-bit double buffer canvas (153.6 KB RAM) for 100% zero-tear DMA flushing
-    spriteBuffer.setColorDepth(8);
+    // Initialize 16-bit RGB565 double-buffer canvas for 100% true-color zero-flicker DMA flushing
+    spriteBuffer.setColorDepth(16);
     void* ptr = spriteBuffer.createSprite(CANVAS_W, CANVAS_H);
     if (!ptr) {
-        Serial.println("[FRAMEWORK ERROR] Failed to allocate full 480x320 double-buffer canvas!");
+        Serial.println("[FRAMEWORK WARNING] Full 480x320 16-bit allocation fallback to 480x270 viewport.");
+        ptr = spriteBuffer.createSprite(CANVAS_W, 270);
+    }
+    
+    if (ptr) {
+        Serial.println("[FRAMEWORK] Allocated 16-bit RGB565 zero-flicker double-buffer canvas.");
     } else {
-        Serial.println("[FRAMEWORK] Allocated full 480x320 zero-flicker double-buffer canvas.");
+        Serial.println("[FRAMEWORK ERROR] Failed to allocate double-buffer sprite.");
     }
 
     // 3. Initialize application using high-level drawing context
@@ -68,7 +74,7 @@ void loop() {
     // 1. Application Physics/State Update
     myApp.update(deltaTime);
 
-    // 2. Application Render Pass
+    // 2. Application Render Pass (Atomic DMA Double-Buffer Pass - Never clears to black)
     tft.startWrite();
     myApp.render(gfx);
     tft.endWrite();
