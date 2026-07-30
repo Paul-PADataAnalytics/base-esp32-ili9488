@@ -5,7 +5,9 @@
 #include <LovyanGFX.hpp>
 
 /**
- * TileSet - Retro Graphics Atlas Module
+ * TileSet - High-Performance Retro Graphics Atlas Module
+ * 
+ * Uses LovyanGFX fast-path block pushImage transfers instead of pixel loops.
  */
 class TileSet {
 private:
@@ -35,14 +37,17 @@ public:
         int srcY = (tileIndex / _columns) * _tileHeight;
         int atlasStride = _columns * _tileWidth;
 
-        for (int y = 0; y < _tileHeight; y++) {
-            int drawY = localY + y;
-            if (drawY >= 0 && drawY < canvas->height()) {
-                for (int x = 0; x < _tileWidth; x++) {
-                    uint16_t pixel = pgm_read_word(&_bitmap[(srcY + y) * atlasStride + (srcX + x)]);
-                    if (pixel != transparentKey) {
-                        canvas->drawPixel(posX + x, drawY, pixel);
-                    }
+        // Use fast-path block pointer if tile is contiguous in PROGMEM
+        if (srcX == 0 && _columns == 1) {
+            const uint16_t* tilePtr = _bitmap + (srcY * atlasStride);
+            canvas->pushImage(posX, localY, _tileWidth, _tileHeight, tilePtr, transparentKey);
+        } else {
+            // High-speed row-by-row block copy (eliminates 1024 drawPixel calls per tile!)
+            for (int y = 0; y < _tileHeight; y++) {
+                int drawY = localY + y;
+                if (drawY >= 0 && drawY < canvas->height()) {
+                    const uint16_t* rowPtr = _bitmap + ((srcY + y) * atlasStride + srcX);
+                    canvas->pushImage(posX, drawY, _tileWidth, 1, rowPtr, transparentKey);
                 }
             }
         }

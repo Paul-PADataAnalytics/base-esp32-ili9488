@@ -5,7 +5,7 @@ LGFX_ILI9488::LGFX_ILI9488() {
         auto cfg = _bus_instance.config();
         cfg.spi_host   = VSPI_HOST;   // Use VSPI (SPI3) on ESP32
         cfg.spi_mode   = 0;
-        cfg.freq_write = 20000000;    // 20 MHz SPI write speed (Rock-solid for breadboard wiring!)
+        cfg.freq_write = 27000000;    // 27 MHz SPI write speed (Boosted SPI DMA transfer throughput!)
         cfg.freq_read  = 16000000;
         cfg.pin_sclk   = 18;          // SCK pin (LCD CLK & Touch TCK)
         cfg.pin_mosi   = 23;          // MOSI pin (LCD SDI & Touch TDI)
@@ -38,7 +38,7 @@ LGFX_ILI9488::LGFX_ILI9488() {
         auto cfg = _touch_instance.config();
         cfg.x_min      = 300;         // Direct X alignment (Left = D-Pad, Right = A/B Buttons)
         cfg.x_max      = 3900;
-        cfg.y_min      = 3700;        // Inverted Y alignment (Bottom = Controls)
+        cfg.y_min      = 3700;        // Inverted Y alignment (Bottom = Touch Controls)
         cfg.y_max      = 200;
         cfg.pin_cs     = 33;          // TCS -> GPIO 33
         cfg.pin_int    = 36;          // PEN -> GPIO 36
