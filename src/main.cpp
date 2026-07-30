@@ -68,8 +68,10 @@ void loop() {
     // 1. Benchmark Physics & Animation Update
     myApp.update(deltaTime);
 
-    // 2. Benchmark Multi-Band 0% Flicker Render Pass
+    // 2. Benchmark Multi-Band 0% Flicker Render Pass (microsecond-timed)
+    unsigned long renderStart = micros();
     myApp.render(gfx);
+    unsigned long renderUs = micros() - renderStart;
 
     // 3. High-Precision FPS & Frame Timing Output
     frameCount++;
@@ -78,6 +80,7 @@ void loop() {
         gfx.setFPS(fps);
         lastFPSTime = now;
         frameCount = 0;
-        Serial.printf("[BENCHMARK METRICS] FPS: %.1f | Free Heap: %d bytes\n", fps, ESP.getFreeHeap());
+        Serial.printf("[BENCHMARK METRICS] FPS: %.1f | Render: %lu us | Free Heap: %d bytes\n",
+                      fps, renderUs, ESP.getFreeHeap());
     }
 }
