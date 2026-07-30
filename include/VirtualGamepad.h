@@ -2,14 +2,13 @@
 #define VIRTUAL_GAMEPAD_H
 
 #include <Arduino.h>
-#include <LovyanGFX.hpp>
 #include "GFXContext.h"
 
 /**
  * VirtualGamepad - On-Screen Touch Controller Subsystem for Retro Games
  * 
- * Provides an on-screen D-Pad (Up, Down, Left, Right) and Action Buttons (A, B).
- * Renders cleanly into the double-buffered sprite to guarantee 0% flicker.
+ * Renders on-screen D-Pad (Up, Down, Left, Right) and Action Buttons (A, B)
+ * across the full 480x320 screen canvas.
  */
 class VirtualGamepad {
 public:
@@ -67,35 +66,27 @@ public:
     }
 
     /**
-     * Render the on-screen Touch D-Pad and Buttons INTO the sprite buffer (0% Flicker).
+     * Render the on-screen Touch D-Pad and Buttons onto full screen.
      */
-    void render(LGFX_Sprite* buffer, uint16_t primaryColor = 0x07FF) {
-        if (!buffer) return;
-
+    void render(GFXContext& gfx) {
         // D-Pad Cross Background
-        uint16_t dpadColor = _state.left || _state.right || _state.up || _state.down ? 0xFFE0 : 0x2A9D;
-        buffer->fillRoundRect(10, 235, 100, 30, 6, dpadColor);
-        buffer->fillRoundRect(45, 200, 30, 100, 6, dpadColor);
-        buffer->drawRoundRect(10, 235, 100, 30, 6, 0xFFFF);
-        buffer->drawRoundRect(45, 200, 30, 100, 6, 0xFFFF);
+        uint16_t dpadColor = _state.left || _state.right || _state.up || _state.down ? 0xFFE0 : gfx.color565(40, 50, 70);
+        gfx.fillRoundRectDirect(10, 235, 100, 30, 6, dpadColor);
+        gfx.fillRoundRectDirect(45, 200, 30, 100, 6, dpadColor);
+        gfx.drawRoundRectDirect(10, 235, 100, 30, 6, 0xFFFF);
+        gfx.drawRoundRectDirect(45, 200, 30, 100, 6, 0xFFFF);
 
         // Action Button A
-        uint16_t colorA = _state.btnA ? 0x07E0 : 0x0400;
-        buffer->fillCircle(430, 260, 22, colorA);
-        buffer->drawCircle(430, 260, 22, 0xFFFF);
-        buffer->setTextColor(0xFFFF, colorA);
-        buffer->setTextSize(2);
-        buffer->setCursor(424, 253);
-        buffer->print("A");
+        uint16_t colorA = _state.btnA ? 0x07E0 : gfx.color565(0, 150, 0);
+        gfx.drawCircleDirect(430, 260, 22, colorA, true);
+        gfx.drawCircleDirect(430, 260, 22, 0xFFFF, false);
+        gfx.drawTextDirect("A", 424, 253, 0xFFFF, 2, colorA);
 
         // Action Button B
-        uint16_t colorB = _state.btnB ? 0xF800 : 0x8000;
-        buffer->fillCircle(360, 260, 22, colorB);
-        buffer->drawCircle(360, 260, 22, 0xFFFF);
-        buffer->setTextColor(0xFFFF, colorB);
-        buffer->setTextSize(2);
-        buffer->setCursor(354, 253);
-        buffer->print("B");
+        uint16_t colorB = _state.btnB ? 0xF800 : gfx.color565(150, 0, 0);
+        gfx.drawCircleDirect(360, 260, 22, colorB, true);
+        gfx.drawCircleDirect(360, 260, 22, 0xFFFF, false);
+        gfx.drawTextDirect("B", 354, 253, 0xFFFF, 2, colorB);
     }
 };
 

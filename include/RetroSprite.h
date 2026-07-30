@@ -57,10 +57,10 @@ public:
     int getHeight() const { return _height; }
 
     /**
-     * Render the sprite onto a target sprite buffer with 2D Rotation and Scaling
+     * Render the sprite onto any LovyanGFX canvas (Display or Sprite) with 2D Rotation and Scaling
      */
-    virtual void render(LGFX_Sprite* buffer) {
-        if (!_bitmap || !buffer) return;
+    virtual void render(LovyanGFX* canvas) {
+        if (!_bitmap || !canvas) return;
 
         LGFX_Sprite srcSprite;
         srcSprite.setColorDepth(16);
@@ -68,7 +68,7 @@ public:
         srcSprite.setPivot(_pivotX, _pivotY);
 
         srcSprite.pushRotateZoom(
-            buffer,
+            canvas,
             _x, _y,
             _angleDeg,
             _scaleX, _scaleY,
@@ -130,10 +130,10 @@ public:
     }
 
     /**
-     * Render active animation frame with 2D Rotation and Scaling
+     * Render active animation frame onto any LovyanGFX canvas (Display or Sprite)
      */
-    void render(LGFX_Sprite* buffer) override {
-        if (!_bitmap || !buffer) return;
+    void render(LovyanGFX* canvas) override {
+        if (!_bitmap || !canvas) return;
 
         const uint16_t* framePointer = _bitmap + (_currentFrame * _frameWidth * _frameHeight);
 
@@ -143,7 +143,7 @@ public:
         srcSprite.setPivot(_pivotX, _pivotY);
 
         srcSprite.pushRotateZoom(
-            buffer,
+            canvas,
             _x, _y,
             _angleDeg,
             _scaleX, _scaleY,

@@ -70,11 +70,12 @@ public:
         }
     }
 
-    void render(LGFX_Sprite* buffer) {
+    void render(LovyanGFX* canvas) {
+        if (!canvas) return;
         for (const auto& p : _particles) {
             float alpha = p.life / p.maxLife;
             uint16_t col = (alpha > 0.5f) ? p.startColor : p.endColor;
-            buffer->fillCircle((int)p.x, (int)p.y, (int)p.size, col);
+            canvas->fillCircle((int)p.x, (int)p.y, (int)p.size, col);
         }
     }
 };

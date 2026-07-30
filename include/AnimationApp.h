@@ -22,9 +22,8 @@
 RTC_DATA_ATTR static int rtcWakeupCount = 0;
 
 /**
- * HAL Framework & Retro Engine v1.4.1 (Pure 0% Flicker Architecture)
- * All drawing (Background, TileMap, Entities, Foreground, Gamepad, HUD, Toasts)
- * is composited 100% inside the off-screen sprite buffer before calling pushBuffer().
+ * HAL Framework & Retro Engine v1.4.2 (Full-Screen 480x320 Canvas Restoration)
+ * Restores full-screen 480x320 viewport rendering for D-Pad, A/B buttons, TileMaps, and UI.
  */
 class AnimationApp : public BaseApp {
 
@@ -74,12 +73,10 @@ public:
           _highScore(0), _score(0) {}
 
     void setup(GFXContext& gfx) override {
-        // Initialize Sound & NVS Persistence
         _sound.init();
         _saveSystem.begin();
         _highScore = _saveSystem.getHighScore();
 
-        // Register Developer Callbacks
         _sleepManager.onPreSleep([this]() {
             Serial.println("[HAL ENGINE] Saving high score before sleep...");
             _saveSystem.saveHighScore(_score);
@@ -117,82 +114,67 @@ public:
         _camera.setPosition(240, 160);
         _camera.setWorldBounds(100, 100, 380, 220);
 
-        _uiManager.showToast("v1.4 0% Flicker Engine!", 0x07FF, 3.0f);
+        _uiManager.showToast("v1.4 Full-Screen Engine!", 0x07FF, 3.0f);
 
-        // --- 100% Zero-Flicker Multi-Layer Pipeline ---
+        // --- Full-Screen 480x320 Multi-Layer Pipeline ---
 
         // 1. BACKGROUND LAYER (Renders at lowest depth below everything)
         _layerManager.addLayer("Background", LayerRole::BACKGROUND, 0, [this](GFXContext& gfx, LGFX_Sprite* buffer, Layer& layer) {
-            buffer->fillScreen(gfx.color565(6, 14, 25));
+            gfx.fillScreen(gfx.color565(6, 14, 25));
             for (int i = 0; i < 8; i++) {
                 float ang = (layer.getRotation() + i * 45) * DEG_TO_RAD;
-                int x2 = (int)(_camera.getRenderX() + cos(ang) * 120);
-                int y2 = (int)(_camera.getRenderY() + sin(ang) * 120);
-                buffer->drawLine((int)_camera.getRenderX(), (int)_camera.getRenderY(), x2, y2, gfx.color565(20, 40, 70));
+                int x2 = (int)(_camera.getRenderX() + cos(ang) * 160);
+                int y2 = (int)(_camera.getRenderY() + sin(ang) * 160);
+                gfx.drawLineDirect((int)_camera.getRenderX(), (int)_camera.getRenderY(), x2, y2, gfx.color565(20, 40, 70));
             }
         });
 
         // 2. WORLD MAP LAYER (TileMap grid level geometry)
         _layerManager.addLayer("TileMap", LayerRole::WORLD_MAP, 0, [this](GFXContext& gfx, LGFX_Sprite* buffer, Layer& layer) {
-            _tileMap.render(buffer, (int)layer.getTranslationX(), 0, 0x0000);
+            _tileMap.render(gfx.getLCD(), (int)layer.getTranslationX(), 0, 0x0000);
         });
 
         // 3. ENTITIES LAYER (Hero, Coins, Energy Spheres, Particles)
         _layerManager.addLayer("Entities", LayerRole::ENTITIES, 0, [this](GFXContext& gfx, LGFX_Sprite* buffer, Layer& layer) {
             // Energy Spheres
             for (int i = 0; i < 3; i++) {
-                buffer->fillCircle((int)_balls[i].x, (int)_balls[i].y, (int)_balls[i].radius, _balls[i].color);
-                buffer->drawCircle((int)_balls[i].x, (int)_balls[i].y, (int)_balls[i].radius + 1, 0xFFFF);
+                gfx.drawCircleDirect((int)_balls[i].x, (int)_balls[i].y, (int)_balls[i].radius, _balls[i].color, true);
+                gfx.drawCircleDirect((int)_balls[i].x, (int)_balls[i].y, (int)_balls[i].radius + 1, 0xFFFF, false);
             }
 
-            _heroSprite.render(buffer);
-            _coinSprite.render(buffer);
-            _particleEngine.render(buffer);
+            _heroSprite.render(gfx.getLCD());
+            _coinSprite.render(gfx.getLCD());
+            _particleEngine.render(gfx.getLCD());
         });
 
         // 4. FOREGROUND LAYER (Tree canopy occlusion above entities!)
         _layerManager.addLayer("Foreground", LayerRole::FOREGROUND, 0, [this](GFXContext& gfx, LGFX_Sprite* buffer, Layer& layer) {
-            _tileSet.drawTile(buffer, 3, 80 + (int)layer.getTranslationX(), 20, 0x0000);
-            _tileSet.drawTile(buffer, 3, 176 + (int)layer.getTranslationX(), 20, 0x0000);
+            _tileSet.drawTile(gfx.getLCD(), 3, 80 + (int)layer.getTranslationX(), 20, 0x0000);
+            _tileSet.drawTile(gfx.getLCD(), 3, 176 + (int)layer.getTranslationX(), 20, 0x0000);
         });
 
-        // 5. UI OVERLAY LAYER (HUD Bar, Score, Sleep Countdown, Gamepad & Toast Banner)
+        // 5. UI OVERLAY LAYER (HUD Bar, Score, Sleep Countdown)
         _layerManager.addLayer("UIOverlay", LayerRole::UI_OVERLAY, 0, [this](GFXContext& gfx, LGFX_Sprite* buffer, Layer& layer) {
             // Top HUD Bar
-            buffer->fillRect(0, 0, 480, 28, gfx.color565(12, 24, 45));
-            buffer->drawRect(0, 0, 480, 28, 0x07FF);
+            gfx.fillRectDirect(0, 0, 480, 28, gfx.color565(12, 24, 45));
+            gfx.drawRectDirect(0, 0, 480, 28, 0x07FF);
 
-            buffer->setTextColor(gfx.color565(0, 255, 255), gfx.color565(12, 24, 45));
-            buffer->setTextSize(2);
-            buffer->setCursor(15, 6);
-            buffer->print("HAL v1.4");
+            gfx.drawTextDirect("HAL v1.4", 15, 6, gfx.color565(0, 255, 255), 2, gfx.color565(12, 24, 45));
 
             char scoreBuf[32];
             snprintf(scoreBuf, sizeof(scoreBuf), "Score:%d High:%d", _score, _highScore);
-            buffer->setTextColor(gfx.color565(0, 255, 120), gfx.color565(12, 24, 45));
-            buffer->setCursor(150, 6);
-            buffer->print(scoreBuf);
+            gfx.drawTextDirect(scoreBuf, 150, 6, gfx.color565(0, 255, 120), 2, gfx.color565(12, 24, 45));
 
             uint32_t secRemaining = _sleepManager.getInactivitySecondsRemaining();
             char sleepBuf[32];
             snprintf(sleepBuf, sizeof(sleepBuf), "Sleep:%lds ", (long)secRemaining);
-            buffer->setTextColor(gfx.color565(255, 165, 0), gfx.color565(12, 24, 45));
-            buffer->setCursor(370, 6);
-            buffer->print(sleepBuf);
+            gfx.drawTextDirect(sleepBuf, 370, 6, gfx.color565(255, 165, 0), 2, gfx.color565(12, 24, 45));
 
             if (rtcWakeupCount > 0) {
                 char wakeBuf[32];
                 snprintf(wakeBuf, sizeof(wakeBuf), "Wakes:%d", rtcWakeupCount);
-                buffer->setTextColor(gfx.color565(0, 255, 120), 0x0000);
-                buffer->setCursor(15, 295);
-                buffer->print(wakeBuf);
+                gfx.drawTextDirect(wakeBuf, 15, 295, gfx.color565(0, 255, 120), 2, 0x0000);
             }
-
-            // On-Screen Touch Gamepad (D-Pad & A/B Buttons rendered inside buffer!)
-            _gamepad.render(buffer);
-
-            // Toast Alert Banner
-            _uiManager.renderToast(buffer);
         });
 
         _sleepManager.resetInactivityTimer();
@@ -283,11 +265,12 @@ public:
             return;
         }
 
-        // Composite ALL Layers, Sprites, Gamepad, HUD & UI Toasts inside Off-screen Sprite Buffer
-        _layerManager.renderAll(gfx, gfx.getSprite());
+        // Composite ALL Layers directly across full 480x320 screen canvas
+        _layerManager.renderAll(gfx, nullptr);
 
-        // Single Atomic DMA Flush to LCD Screen (100% Zero Flicker!)
-        gfx.pushBuffer();
+        // Render On-Screen Touch Gamepad Controls & Toast Banner across 480x320 screen
+        _gamepad.render(gfx);
+        _uiManager.renderToast(gfx);
     }
 };
 

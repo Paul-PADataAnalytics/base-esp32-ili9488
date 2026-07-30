@@ -28,10 +28,10 @@ public:
     int getRows() const { return _rows; }
 
     /**
-     * Renders a tile by index from the tileset atlas into a sprite buffer.
+     * Renders a tile by index from the tileset atlas into any LovyanGFX canvas (Display or Sprite).
      */
-    void drawTile(LGFX_Sprite* sprite, int tileIndex, int posX, int posY, uint16_t transparentKey = 0xFFFF) const {
-        if (tileIndex < 0 || !_bitmap || !sprite) return;
+    void drawTile(LovyanGFX* canvas, int tileIndex, int posX, int posY, uint16_t transparentKey = 0xFFFF) const {
+        if (tileIndex < 0 || !_bitmap || !canvas) return;
 
         int srcX = (tileIndex % _columns) * _tileWidth;
         int srcY = (tileIndex / _columns) * _tileHeight;
@@ -41,7 +41,7 @@ public:
             for (int x = 0; x < _tileWidth; x++) {
                 uint16_t pixel = pgm_read_word(&_bitmap[(srcY + y) * atlasStride + (srcX + x)]);
                 if (pixel != transparentKey) {
-                    sprite->drawPixel(posX + x, posY + y, pixel);
+                    canvas->drawPixel(posX + x, posY + y, pixel);
                 }
             }
         }

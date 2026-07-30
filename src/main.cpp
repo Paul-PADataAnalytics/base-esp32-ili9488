@@ -12,12 +12,13 @@
 static LGFX_ILI9488 tft;
 static LGFX_Sprite  spriteBuffer(&tft);
 
-// Application & Abstraction Layer
-const int SPRITE_SIZE = 180;
-const int SPRITE_X    = (480 - SPRITE_SIZE) / 2;
-const int SPRITE_Y    = (320 - SPRITE_SIZE) / 2 + 10;
+// Full 480x320 Display Canvas
+const int CANVAS_W = 480;
+const int CANVAS_H = 320;
+const int CANVAS_X = 0;
+const int CANVAS_Y = 0;
 
-static GFXContext gfx(&tft, &spriteBuffer, SPRITE_X, SPRITE_Y, SPRITE_SIZE, SPRITE_SIZE);
+static GFXContext gfx(&tft, &spriteBuffer, CANVAS_X, CANVAS_Y, CANVAS_W, CANVAS_H);
 static AnimationApp myApp;
 
 unsigned long lastFrameTime = 0;
@@ -41,8 +42,9 @@ void setup() {
     tft.setRotation(1); // Landscape mode (480x320)
     tft.fillScreen(gfx.color565(8, 19, 19));
 
+    // Initialize 16-bit double buffer canvas
     spriteBuffer.setColorDepth(16);
-    spriteBuffer.createSprite(SPRITE_SIZE, SPRITE_SIZE);
+    spriteBuffer.createSprite(240, 160); // High-res 16-bit double buffer
 
     // 3. Initialize application using high-level drawing context
     myApp.setup(gfx);

@@ -26,10 +26,10 @@ public:
     }
 
     /**
-     * Renders the tilemap onto a sprite buffer with offset support for scrolling.
+     * Renders the tilemap onto any LovyanGFX canvas (Display or Sprite).
      */
-    void render(LGFX_Sprite* sprite, int offsetX = 0, int offsetY = 0, uint16_t transparentKey = 0xFFFF) const {
-        if (!_tileSet || !_mapData || !sprite) return;
+    void render(LovyanGFX* canvas, int offsetX = 0, int offsetY = 0, uint16_t transparentKey = 0xFFFF) const {
+        if (!_tileSet || !_mapData || !canvas) return;
 
         int tw = _tileSet->getTileWidth();
         int th = _tileSet->getTileHeight();
@@ -41,10 +41,10 @@ public:
                     int drawX = col * tw + offsetX;
                     int drawY = row * th + offsetY;
 
-                    // Culling check: only render tiles visible in sprite viewport
-                    if (drawX + tw >= 0 && drawX < sprite->width() &&
-                        drawY + th >= 0 && drawY < sprite->height()) {
-                        _tileSet->drawTile(sprite, tileId, drawX, drawY, transparentKey);
+                    // Culling check: only render tiles visible in viewport
+                    if (drawX + tw >= 0 && drawX < canvas->width() &&
+                        drawY + th >= 0 && drawY < canvas->height()) {
+                        _tileSet->drawTile(canvas, tileId, drawX, drawY, transparentKey);
                     }
                 }
             }
