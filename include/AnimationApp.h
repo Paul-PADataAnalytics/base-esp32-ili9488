@@ -22,7 +22,7 @@
 RTC_DATA_ATTR static int rtcWakeupCount = 0;
 
 /**
- * HAL Framework & Retro Engine v1.4.3 (Touch X-Axis Un-Mirrored Calibration)
+ * HAL Framework & Retro Engine v1.4.4 (Auto-Sleep Disabled For Debugging)
  */
 class AnimationApp : public BaseApp {
 
@@ -62,7 +62,7 @@ private:
 
 public:
     AnimationApp() 
-        : _sleepManager(20, SleepMode::DEEP_SLEEP),
+        : _sleepManager(0, SleepMode::LIGHT_SLEEP), // Auto-sleep disabled (0s timeout) for continuous debugging!
           _tileSet(RETRO_TILESET_32x32, 16, 16, 32, 32),
           _tileMap(&_tileSet, RETRO_LEVEL_MAP, 16, 10),
           _particleEngine(150),
@@ -80,6 +80,9 @@ public:
         _sound.init();
         _saveSystem.begin();
         _highScore = _saveSystem.getHighScore();
+
+        // Explicitly disable auto-sleep timer so unit stays awake continuously while debugging
+        _sleepManager.disableAutoSleep();
 
         _sleepManager.onPreSleep([this]() {
             Serial.println("[HAL ENGINE] Saving high score before sleep...");
@@ -118,7 +121,7 @@ public:
         _camera.setPosition(240, 160);
         _camera.setWorldBounds(100, 100, 380, 220);
 
-        _uiManager.showToast("Touch Un-Mirrored Calibrated!", 0x07FF, 3.0f);
+        _uiManager.showToast("Auto-Sleep OFF (Debug Mode)", 0x07FF, 3.5f);
 
         // --- Full-Screen 480x320 Multi-Layer Pipeline ---
 
@@ -169,10 +172,7 @@ public:
             snprintf(scoreBuf, sizeof(scoreBuf), "Score:%d High:%d", _score, _highScore);
             gfx.drawTextDirect(scoreBuf, 150, 6, gfx.color565(0, 255, 120), 2, gfx.color565(12, 24, 45));
 
-            uint32_t secRemaining = _sleepManager.getInactivitySecondsRemaining();
-            char sleepBuf[32];
-            snprintf(sleepBuf, sizeof(sleepBuf), "Sleep:%lds ", (long)secRemaining);
-            gfx.drawTextDirect(sleepBuf, 370, 6, gfx.color565(255, 165, 0), 2, gfx.color565(12, 24, 45));
+            gfx.drawTextDirect("Sleep:OFF", 370, 6, gfx.color565(255, 165, 0), 2, gfx.color565(12, 24, 45));
 
             if (rtcWakeupCount > 0) {
                 char wakeBuf[32];
@@ -261,15 +261,11 @@ public:
             _particleEngine.emitExplosion(_heroSprite.getX(), _heroSprite.getY(), 12, 0xFFE0, 0xF800);
             _sound.playLaser();
             _camera.triggerShake(10.0f, 0.4f);
-            _sleepManager.resetInactivityTimer();
         }
 
         _isTouchActive = gfx.getTouch(&_activeTouchX, &_activeTouchY);
-        if (_isTouchActive) {
-            _sleepManager.resetInactivityTimer();
-        }
 
-        // Check Auto-Sleep Trigger
+        // Check Auto-Sleep Trigger (Disabled)
         if (_sleepManager.shouldAutoSleep()) {
             _sleepManager.triggerSleep(gfx);
             return;

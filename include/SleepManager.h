@@ -37,10 +37,10 @@ private:
     SleepCallback _postWakeCallback;
 
 public:
-    SleepManager(uint32_t inactivityTimeoutSeconds = 20, SleepMode mode = SleepMode::LIGHT_SLEEP)
+    SleepManager(uint32_t inactivityTimeoutSeconds = 0, SleepMode mode = SleepMode::LIGHT_SLEEP)
         : _inactivityTimeoutMs(inactivityTimeoutSeconds * 1000),
           _lastActivityTime(0),
-          _autoSleepEnabled(true),
+          _autoSleepEnabled(inactivityTimeoutSeconds > 0),
           _isSleeping(false),
           _chosenSleepMode(mode),
           _preSleepCallback(nullptr),
@@ -63,6 +63,14 @@ public:
         _inactivityTimeoutMs = seconds * 1000;
         _autoSleepEnabled    = (seconds > 0);
         resetInactivityTimer();
+    }
+
+    void disableAutoSleep() {
+        _autoSleepEnabled = false;
+    }
+
+    void enableAutoSleep(uint32_t seconds = 20) {
+        setAutoSleepTimeout(seconds);
     }
 
     bool isAutoSleepEnabled() const { return _autoSleepEnabled; }
