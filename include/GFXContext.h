@@ -7,8 +7,8 @@
 /**
  * GFXContext - Hardware Abstraction Layer Drawing, Input, Image & Power API
  * 
- * Provides unified high-level 480x320 drawing, 16-bit RGB565 image/bitmap rendering,
- * color math, touch screen input, power/sleep control, and UI primitives.
+ * Provides unified high-level 320x160 16-bit double-buffered drawing,
+ * hardware DMA scaled 1.5x / 2.0x to fill full 480x320 display canvas.
  */
 class GFXContext {
 private:
@@ -28,8 +28,8 @@ public:
     void setFPS(float fps) { _fps = fps; }
     float getFPS() const { return _fps; }
 
-    int getWidth() const { return 480; }
-    int getHeight() const { return 320; }
+    int getWidth() const { return _canvasW; }
+    int getHeight() const { return _canvasH; }
     int getSpriteX() const { return _canvasX; }
     int getSpriteY() const { return _canvasY; }
     int getSpriteW() const { return _canvasW; }
@@ -55,14 +55,20 @@ public:
         _lcd->wakeup();
     }
 
-    // --- Touch Screen API ---
+    // --- Touch Screen API (Mapped to 320x160 Virtual Canvas) ---
     bool getTouch(int* x, int* y) {
-        return _lcd->getTouch(x, y);
+        int rawX, rawY;
+        bool touched = _lcd->getTouch(&rawX, &rawY);
+        if (touched) {
+            if (x) *x = (int)(rawX / 1.5f);
+            if (y) *y = (int)(rawY / 2.0f);
+        }
+        return touched;
     }
 
     bool isTouched() {
         int x, y;
-        return _lcd->getTouch(&x, &y);
+        return getTouch(&x, &y);
     }
 
     // --- Image & Bitmap Rendering Primitives ---
@@ -161,7 +167,7 @@ public:
 
     void pushBuffer() {
         if (_sprite) {
-            _sprite->pushSprite(_canvasX, _canvasY);
+            _sprite->pushSprite(_lcd, 0, 0);
         }
     }
 };

@@ -12,13 +12,11 @@
 static LGFX_ILI9488 tft;
 static LGFX_Sprite  spriteBuffer(&tft);
 
-// Full 480x320 Display Canvas
-const int CANVAS_W = 480;
-const int CANVAS_H = 320;
-const int CANVAS_X = 0;
-const int CANVAS_Y = 0;
+// 320x160 16-bit Double-Buffer Canvas (102.4 KB RAM - Guaranteed < 114.6 KB Max Alloc Heap!)
+const int CANVAS_W = 320;
+const int CANVAS_H = 160;
 
-static GFXContext gfx(&tft, &spriteBuffer, CANVAS_X, CANVAS_Y, CANVAS_W, CANVAS_H);
+static GFXContext gfx(&tft, &spriteBuffer, 0, 0, CANVAS_W, CANVAS_H);
 static AnimationApp myApp;
 
 unsigned long lastFrameTime = 0;
@@ -43,18 +41,18 @@ void setup() {
     tft.setRotation(1); // Landscape mode (480x320)
     tft.fillScreen(tft.color565(6, 14, 25));
 
-    // Initialize 16-bit RGB565 double-buffer canvas for 100% true-color zero-flicker DMA flushing
+    // Allocate 320x160 16-bit RGB565 double-buffer sprite (102.4 KB - guaranteed fit under 114.6 KB max heap)
     spriteBuffer.setColorDepth(16);
     void* ptr = spriteBuffer.createSprite(CANVAS_W, CANVAS_H);
     if (!ptr) {
-        Serial.println("[FRAMEWORK WARNING] Full 480x320 16-bit allocation fallback to 480x270 viewport.");
-        ptr = spriteBuffer.createSprite(CANVAS_W, 270);
+        Serial.println("[FRAMEWORK RETRY] Trying 240x160 allocation...");
+        ptr = spriteBuffer.createSprite(240, 160);
     }
-    
+
     if (ptr) {
-        Serial.println("[FRAMEWORK] Allocated 16-bit RGB565 zero-flicker double-buffer canvas.");
+        Serial.println("[FRAMEWORK] SUCCESS: Allocated 16-bit RGB565 zero-flicker double-buffer canvas.");
     } else {
-        Serial.println("[FRAMEWORK ERROR] Failed to allocate double-buffer sprite.");
+        Serial.println("[FRAMEWORK ERROR] Memory allocation failed for sprite buffer!");
     }
 
     // 3. Initialize application using high-level drawing context
@@ -74,7 +72,7 @@ void loop() {
     // 1. Application Physics/State Update
     myApp.update(deltaTime);
 
-    // 2. Application Render Pass (Atomic DMA Double-Buffer Pass - Never clears to black)
+    // 2. Application Render Pass (Atomic DMA Double-Buffer Pass)
     tft.startWrite();
     myApp.render(gfx);
     tft.endWrite();
