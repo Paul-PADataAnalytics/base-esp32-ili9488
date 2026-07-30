@@ -34,12 +34,12 @@ LGFX_ILI9488::LGFX_ILI9488() {
         _panel_instance.config(cfg);
     }
 
-    { // Touch Controller Configuration (XPT2046 on Shared Bus - Dual-Axis Inverted Calibration)
+    { // Touch Controller Configuration (XPT2046 on Shared Bus - Un-flip Short Y Axis)
         auto cfg = _touch_instance.config();
-        cfg.x_min      = 3900;        // Inverted X axis
+        cfg.x_min      = 3900;        // Inverted X axis (480px width)
         cfg.x_max      = 300;
-        cfg.y_min      = 3700;        // Inverted Y axis (Mirrored along both axes!)
-        cfg.y_max      = 200;
+        cfg.y_min      = 200;         // Un-flipped Y axis (320px height)
+        cfg.y_max      = 3700;
         cfg.pin_cs     = 33;          // TCS -> GPIO 33
         cfg.pin_int    = 36;          // PEN -> GPIO 36
         cfg.spi_host   = VSPI_HOST;   // Target VSPI_HOST explicitly
