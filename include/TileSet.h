@@ -7,7 +7,7 @@
 /**
  * TileSet - High-Performance Retro Graphics Atlas Module
  * 
- * Includes PROGMEM safe flash reads into DRAM row buffers for crisp 16-bit color rendering.
+ * Direct 16-bit RGB565 PROGMEM tile renderer with explicit transparency masking.
  */
 class TileSet {
 private:
@@ -27,7 +27,7 @@ public:
     int getColumns() const { return _columns; }
     int getRows() const { return _rows; }
 
-    void drawTile(LovyanGFX* canvas, int tileIndex, int posX, int posY, int bandY = 0, uint16_t transparentKey = 0xFFFF) const {
+    void drawTile(LovyanGFX* canvas, int tileIndex, int posX, int posY, int bandY = 0, uint16_t transparentKey = 0x0000) const {
         if (tileIndex < 0 || !_bitmap || !canvas) return;
 
         int localY = posY - bandY;
@@ -57,16 +57,20 @@ public:
 
         if (drawH <= 0) return;
 
-        // 3. PROGMEM Safe Row-by-Row pushImage Transfer (Stack RAM Buffer)
-        uint16_t rowBuffer[64]; // Max 64px width tile
+        // 3. Fast Row Transfer into Sprite Buffer
+        uint16_t rowBuffer[64];
         int copyW = (_tileWidth > 64) ? 64 : _tileWidth;
 
         for (int y = startY; y < startY + drawH; y++) {
             int flashRowOffset = (srcY + y) * atlasStride + srcX;
+            int destY = drawY + (y - startY);
+
             for (int x = 0; x < copyW; x++) {
-                rowBuffer[x] = pgm_read_word(&_bitmap[flashRowOffset + x]);
+                uint16_t pixel = pgm_read_word(&_bitmap[flashRowOffset + x]);
+                if (pixel != transparentKey) {
+                    canvas->drawPixel(posX + x, destY, pixel);
+                }
             }
-            canvas->pushImage(posX, drawY + (y - startY), copyW, 1, rowBuffer, transparentKey);
         }
     }
 };
