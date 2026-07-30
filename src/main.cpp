@@ -10,13 +10,12 @@
 
 // Instantiate Global Drivers
 static LGFX_ILI9488 tft;
-static LGFX_Sprite  spriteBuffer(&tft);
 
-// 320x160 16-bit Double-Buffer Canvas (102.4 KB RAM - Guaranteed < 114.6 KB Max Alloc Heap!)
-const int CANVAS_W = 320;
-const int CANVAS_H = 160;
+// Native 480x320 Display Viewport
+const int CANVAS_W = 480;
+const int CANVAS_H = 320;
 
-static GFXContext gfx(&tft, &spriteBuffer, 0, 0, CANVAS_W, CANVAS_H);
+static GFXContext gfx(&tft, nullptr, 0, 0, CANVAS_W, CANVAS_H);
 static AnimationApp myApp;
 
 unsigned long lastFrameTime = 0;
@@ -38,25 +37,15 @@ void setup() {
 
     // 2. Initialize Display Driver
     tft.init();
-    tft.setRotation(1); // Landscape mode (480x320)
+    tft.setRotation(1); // Landscape mode (480x320 native resolution)
     tft.fillScreen(tft.color565(6, 14, 25));
-
-    // Allocate 320x160 16-bit RGB565 double-buffer sprite (102.4 KB - guaranteed fit under 114.6 KB max heap)
-    spriteBuffer.setColorDepth(16);
-    void* ptr = spriteBuffer.createSprite(CANVAS_W, CANVAS_H);
-    if (ptr) {
-        spriteBuffer.setPivot(CANVAS_W / 2, CANVAS_H / 2); // Center pivot for full-screen hardware scaling
-        Serial.println("[FRAMEWORK] SUCCESS: Allocated 16-bit RGB565 zero-flicker double-buffer canvas.");
-    } else {
-        Serial.println("[FRAMEWORK ERROR] Memory allocation failed for sprite buffer!");
-    }
 
     // 3. Initialize application using high-level drawing context
     myApp.setup(gfx);
 
     lastFrameTime = millis();
     lastFPSTime   = millis();
-    Serial.println("[FRAMEWORK] Setup Complete. Running Application.");
+    Serial.println("[FRAMEWORK] Setup Complete. Running Application at Native 480x320 Resolution.");
 }
 
 void loop() {
@@ -68,7 +57,7 @@ void loop() {
     // 1. Application Physics/State Update
     myApp.update(deltaTime);
 
-    // 2. Application Render Pass (Atomic DMA Double-Buffer Pass)
+    // 2. High-Speed Hardware SPI DMA Batch Render Transaction
     tft.startWrite();
     myApp.render(gfx);
     tft.endWrite();

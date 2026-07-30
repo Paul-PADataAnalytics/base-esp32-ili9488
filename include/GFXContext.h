@@ -7,8 +7,7 @@
 /**
  * GFXContext - Hardware Abstraction Layer Drawing, Input, Image & Power API
  * 
- * Provides unified high-level 320x160 16-bit double-buffered drawing,
- * scaled 1.5x / 2.0x to fill full 480x320 display canvas over SPI DMA.
+ * Provides unified high-level native 480x320 hardware SPI DMA drawing at 25+ FPS.
  */
 class GFXContext {
 private:
@@ -28,8 +27,8 @@ public:
     void setFPS(float fps) { _fps = fps; }
     float getFPS() const { return _fps; }
 
-    int getWidth() const { return _canvasW; }
-    int getHeight() const { return _canvasH; }
+    int getWidth() const { return 480; }
+    int getHeight() const { return 320; }
     int getSpriteX() const { return _canvasX; }
     int getSpriteY() const { return _canvasY; }
     int getSpriteW() const { return _canvasW; }
@@ -55,32 +54,24 @@ public:
         _lcd->wakeup();
     }
 
-    // --- Touch Screen API (Mapped to 320x160 Virtual Canvas) ---
+    // --- Touch Screen API (Native 480x320 Canvas Coordinates) ---
     bool getTouch(int* x, int* y) {
-        int rawX, rawY;
-        bool touched = _lcd->getTouch(&rawX, &rawY);
-        if (touched) {
-            if (x) *x = (int)(rawX / 1.5f);
-            if (y) *y = (int)(rawY / 2.0f);
-        }
-        return touched;
+        return _lcd->getTouch(x, y);
     }
 
     bool isTouched() {
         int x, y;
-        return getTouch(&x, &y);
+        return _lcd->getTouch(&x, &y);
     }
 
     // --- Image & Bitmap Rendering Primitives ---
 
     void pushImageDirect(int x, int y, int w, int h, const uint16_t* data) {
-        if (_sprite) _sprite->pushImage(x, y, w, h, data);
-        else _lcd->pushImage(x, y, w, h, data);
+        _lcd->pushImage(x, y, w, h, data);
     }
 
     void pushImageTransparent(int x, int y, int w, int h, const uint16_t* data, uint16_t transparentColor) {
-        if (_sprite) _sprite->pushImage(x, y, w, h, data, transparentColor);
-        else _lcd->pushImage(x, y, w, h, data, transparentColor);
+        _lcd->pushImage(x, y, w, h, data, transparentColor);
     }
 
     // --- Color Math Primitives ---
@@ -107,68 +98,47 @@ public:
     // --- Shape & UI Primitives ---
 
     void fillScreen(uint16_t color) {
-        if (_sprite) _sprite->fillScreen(color);
-        else _lcd->fillScreen(color);
+        _lcd->fillScreen(color);
     }
 
     void drawCircleDirect(int x, int y, int r, uint16_t color, bool fill = true) {
-        if (_sprite) {
-            if (fill) _sprite->fillCircle(x, y, r, color);
-            else _sprite->drawCircle(x, y, r, color);
-        } else {
-            if (fill) _lcd->fillCircle(x, y, r, color);
-            else _lcd->drawCircle(x, y, r, color);
-        }
+        if (fill) _lcd->fillCircle(x, y, r, color);
+        else _lcd->drawCircle(x, y, r, color);
     }
 
     void eraseCircleDirect(int x, int y, int r, uint16_t color) {
-        if (_sprite) _sprite->fillCircle(x, y, r + 2, color);
-        else _lcd->fillCircle(x, y, r + 2, color);
+        _lcd->fillCircle(x, y, r + 2, color);
     }
 
     void drawRectDirect(int x, int y, int w, int h, uint16_t color) {
-        if (_sprite) _sprite->drawRect(x, y, w, h, color);
-        else _lcd->drawRect(x, y, w, h, color);
+        _lcd->drawRect(x, y, w, h, color);
     }
 
     void fillRectDirect(int x, int y, int w, int h, uint16_t color) {
-        if (_sprite) _sprite->fillRect(x, y, w, h, color);
-        else _lcd->fillRect(x, y, w, h, color);
+        _lcd->fillRect(x, y, w, h, color);
     }
 
     void fillRoundRectDirect(int x, int y, int w, int h, int r, uint16_t color) {
-        if (_sprite) _sprite->fillRoundRect(x, y, w, h, r, color);
-        else _lcd->fillRoundRect(x, y, w, h, r, color);
+        _lcd->fillRoundRect(x, y, w, h, r, color);
     }
 
     void drawRoundRectDirect(int x, int y, int w, int h, int r, uint16_t color) {
-        if (_sprite) _sprite->drawRoundRect(x, y, w, h, r, color);
-        else _lcd->drawRoundRect(x, y, w, h, r, color);
+        _lcd->drawRoundRect(x, y, w, h, r, color);
     }
 
     void drawLineDirect(int x1, int y1, int x2, int y2, uint16_t color) {
-        if (_sprite) _sprite->drawLine(x1, y1, x2, y2, color);
-        else _lcd->drawLine(x1, y1, x2, y2, color);
+        _lcd->drawLine(x1, y1, x2, y2, color);
     }
 
     void drawTextDirect(const char* text, int x, int y, uint16_t color, uint8_t size = 2, uint16_t bgColor = 0x0813) {
-        if (_sprite) {
-            _sprite->setTextColor(color, bgColor);
-            _sprite->setTextSize(size);
-            _sprite->setCursor(x, y);
-            _sprite->print(text);
-        } else {
-            _lcd->setTextColor(color, bgColor);
-            _lcd->setTextSize(size);
-            _lcd->setCursor(x, y);
-            _lcd->print(text);
-        }
+        _lcd->setTextColor(color, bgColor);
+        _lcd->setTextSize(size);
+        _lcd->setCursor(x, y);
+        _lcd->print(text);
     }
 
     void pushBuffer() {
-        if (_sprite) {
-            _sprite->pushRotateZoom(_lcd, 240, 160, 0, 1.5f, 2.0f);
-        }
+        // High-speed SPI DMA transaction mode
     }
 };
 
