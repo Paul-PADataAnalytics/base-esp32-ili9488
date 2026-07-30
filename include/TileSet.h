@@ -7,7 +7,7 @@
 /**
  * TileSet - High-Performance Retro Graphics Atlas Module
  * 
- * Corrects LovyanGFX SPI byte-ordering to restore true 16-bit RGB565 tile colors.
+ * Direct 16-bit RGB565 PROGMEM tile renderer without double byte-swapping.
  */
 class TileSet {
 private:
@@ -57,7 +57,7 @@ public:
 
         if (drawH <= 0) return;
 
-        // 3. Fast Row Transfer into Sprite Buffer with Byte-Swap Correction
+        // 3. Fast Row Transfer into Sprite Buffer (Native Host Byte Order)
         uint16_t rowBuffer[64];
         int copyW = (_tileWidth > 64) ? 64 : _tileWidth;
 
@@ -66,9 +66,7 @@ public:
             int destY = drawY + (y - startY);
 
             for (int x = 0; x < copyW; x++) {
-                uint16_t rawPixel = pgm_read_word(&_bitmap[flashRowOffset + x]);
-                // Byte-swap for LovyanGFX 16-bit RGB565 sprite buffer
-                rowBuffer[x] = (rawPixel >> 8) | (rawPixel << 8);
+                rowBuffer[x] = pgm_read_word(&_bitmap[flashRowOffset + x]);
             }
 
             if (transparentKey == 0xFFFF) {
