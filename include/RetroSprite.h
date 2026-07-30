@@ -6,13 +6,6 @@
 
 /**
  * RetroSprite - Advanced 2D Sprite Module
- * 
- * Supports 2D Affine Matrix Transformations:
- * - Translation (x, y)
- * - Scaling (scaleX, scaleY)
- * - Rotation (degrees around custom pivot)
- * - Custom Pivot Point (pivotX, pivotY)
- * - Transparent Color Keying
  */
 class RetroSprite {
 protected:
@@ -38,7 +31,6 @@ public:
 
     virtual ~RetroSprite() {}
 
-    // Transform Setters
     void setPosition(float x, float y) { _x = x; _y = y; }
     void move(float dx, float dy) { _x += dx; _y += dy; }
     void setScale(float sx, float sy) { _scaleX = sx; _scaleY = sy; }
@@ -56,11 +48,10 @@ public:
     int getWidth() const { return _width; }
     int getHeight() const { return _height; }
 
-    /**
-     * Render the sprite onto any LovyanGFX canvas (Display or Sprite) with 2D Rotation and Scaling
-     */
-    virtual void render(LovyanGFX* canvas) {
+    virtual void render(LovyanGFX* canvas, int bandY = 0) {
         if (!_bitmap || !canvas) return;
+
+        float localY = _y - bandY;
 
         LGFX_Sprite srcSprite;
         srcSprite.setColorDepth(16);
@@ -69,7 +60,7 @@ public:
 
         srcSprite.pushRotateZoom(
             canvas,
-            _x, _y,
+            _x, localY,
             _angleDeg,
             _scaleX, _scaleY,
             _transparentKey
@@ -79,9 +70,6 @@ public:
 
 /**
  * AnimatedSprite - Multi-Frame Animated Sprite Engine
- * 
- * Supports multi-frame sprite sheets with frame duration control,
- * looping, and 2D rotation & scaling rendering.
  */
 class AnimatedSprite : public RetroSprite {
 private:
@@ -89,7 +77,7 @@ private:
     int   _frameHeight;
     int   _totalFrames;
     int   _currentFrame;
-    float _frameDuration; // Seconds per frame
+    float _frameDuration;
     float _elapsedTime;
     bool  _loop;
     bool  _playing;
@@ -129,12 +117,10 @@ public:
         }
     }
 
-    /**
-     * Render active animation frame onto any LovyanGFX canvas (Display or Sprite)
-     */
-    void render(LovyanGFX* canvas) override {
+    void render(LovyanGFX* canvas, int bandY = 0) override {
         if (!_bitmap || !canvas) return;
 
+        float localY = _y - bandY;
         const uint16_t* framePointer = _bitmap + (_currentFrame * _frameWidth * _frameHeight);
 
         LGFX_Sprite srcSprite;
@@ -144,7 +130,7 @@ public:
 
         srcSprite.pushRotateZoom(
             canvas,
-            _x, _y,
+            _x, localY,
             _angleDeg,
             _scaleX, _scaleY,
             _transparentKey

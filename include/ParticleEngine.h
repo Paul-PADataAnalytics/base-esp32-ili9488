@@ -12,7 +12,7 @@ struct Particle {
     float x, y;
     float vx, vy;
     float ax, ay;
-    float life;       // Seconds remaining
+    float life;
     float maxLife;
     float size;
     uint16_t startColor;
@@ -21,8 +21,6 @@ struct Particle {
 
 /**
  * ParticleEngine - Retro Particle & FX Subsystem
- * 
- * Supports explosions, sparks, fire, magic dust, and coin pickup effects!
  */
 class ParticleEngine {
 private:
@@ -44,7 +42,7 @@ public:
             p.vx = cos(angle) * speed;
             p.vy = sin(angle) * speed;
             p.ax = 0.0f;
-            p.ay = 0.15f; // Gravity
+            p.ay = 0.15f;
             p.life = life;
             p.maxLife = life;
             p.size = random(2, 5);
@@ -70,12 +68,15 @@ public:
         }
     }
 
-    void render(LovyanGFX* canvas) {
+    void render(LovyanGFX* canvas, int bandY = 0) {
         if (!canvas) return;
         for (const auto& p : _particles) {
-            float alpha = p.life / p.maxLife;
-            uint16_t col = (alpha > 0.5f) ? p.startColor : p.endColor;
-            canvas->fillCircle((int)p.x, (int)p.y, (int)p.size, col);
+            float localY = p.y - bandY;
+            if (localY + p.size >= 0 && localY - p.size < canvas->height()) {
+                float alpha = p.life / p.maxLife;
+                uint16_t col = (alpha > 0.5f) ? p.startColor : p.endColor;
+                canvas->fillCircle((int)p.x, (int)localY, (int)p.size, col);
+            }
         }
     }
 };

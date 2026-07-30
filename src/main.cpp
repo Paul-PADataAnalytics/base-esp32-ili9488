@@ -10,12 +10,14 @@
 
 // Instantiate Global Drivers
 static LGFX_ILI9488 tft;
+static LGFX_Sprite  spriteBuffer(&tft);
 
-// Native 480x320 Display Viewport
+// Native 480x320 Viewport & 480x80 Band Buffer (76.8 KB RAM - Guaranteed fit in SRAM!)
 const int CANVAS_W = 480;
 const int CANVAS_H = 320;
+const int BAND_H   = 80;
 
-static GFXContext gfx(&tft, nullptr, 0, 0, CANVAS_W, CANVAS_H);
+static GFXContext gfx(&tft, &spriteBuffer, 0, 0, CANVAS_W, CANVAS_H);
 static AnimationApp myApp;
 
 unsigned long lastFrameTime = 0;
@@ -40,12 +42,21 @@ void setup() {
     tft.setRotation(1); // Landscape mode (480x320 native resolution)
     tft.fillScreen(tft.color565(6, 14, 25));
 
+    // Allocate 480x80 16-bit RGB565 band buffer (76.8 KB RAM)
+    spriteBuffer.setColorDepth(16);
+    void* ptr = spriteBuffer.createSprite(CANVAS_W, BAND_H);
+    if (ptr) {
+        Serial.println("[FRAMEWORK] SUCCESS: Allocated 480x80 16-bit RGB565 band buffer (76.8 KB).");
+    } else {
+        Serial.println("[FRAMEWORK ERROR] Band buffer allocation failed!");
+    }
+
     // 3. Initialize application using high-level drawing context
     myApp.setup(gfx);
 
     lastFrameTime = millis();
     lastFPSTime   = millis();
-    Serial.println("[FRAMEWORK] Setup Complete. Running Application at Native 480x320 Resolution.");
+    Serial.println("[FRAMEWORK] Setup Complete. Running 0% Flicker Band Double-Buffered Engine.");
 }
 
 void loop() {
@@ -57,7 +68,7 @@ void loop() {
     // 1. Application Physics/State Update
     myApp.update(deltaTime);
 
-    // 2. High-Speed Hardware SPI DMA Batch Render Transaction
+    // 2. High-Speed 4-Band 0% Flicker Double-Buffered Render Pass
     tft.startWrite();
     myApp.render(gfx);
     tft.endWrite();

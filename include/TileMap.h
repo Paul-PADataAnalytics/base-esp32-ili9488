@@ -25,10 +25,7 @@ public:
         return _mapData[row * _mapWidth + col];
     }
 
-    /**
-     * Renders the tilemap onto any LovyanGFX canvas (Display or Sprite).
-     */
-    void render(LovyanGFX* canvas, int offsetX = 0, int offsetY = 0, uint16_t transparentKey = 0xFFFF) const {
+    void render(LovyanGFX* canvas, int offsetX = 0, int offsetY = 0, int bandY = 0, uint16_t transparentKey = 0xFFFF) const {
         if (!_tileSet || !_mapData || !canvas) return;
 
         int tw = _tileSet->getTileWidth();
@@ -40,12 +37,7 @@ public:
                 if (tileId >= 0) {
                     int drawX = col * tw + offsetX;
                     int drawY = row * th + offsetY;
-
-                    // Culling check: only render tiles visible in viewport
-                    if (drawX + tw >= 0 && drawX < canvas->width() &&
-                        drawY + th >= 0 && drawY < canvas->height()) {
-                        _tileSet->drawTile(canvas, tileId, drawX, drawY, transparentKey);
-                    }
+                    _tileSet->drawTile(canvas, tileId, drawX, drawY, bandY, transparentKey);
                 }
             }
         }

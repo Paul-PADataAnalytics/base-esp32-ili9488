@@ -6,8 +6,6 @@
 
 /**
  * TileSet - Retro Graphics Atlas Module
- * 
- * Manages fixed-size tile spritesheets (8x8, 16x16) for retro games.
  */
 class TileSet {
 private:
@@ -27,21 +25,24 @@ public:
     int getColumns() const { return _columns; }
     int getRows() const { return _rows; }
 
-    /**
-     * Renders a tile by index from the tileset atlas into any LovyanGFX canvas (Display or Sprite).
-     */
-    void drawTile(LovyanGFX* canvas, int tileIndex, int posX, int posY, uint16_t transparentKey = 0xFFFF) const {
+    void drawTile(LovyanGFX* canvas, int tileIndex, int posX, int posY, int bandY = 0, uint16_t transparentKey = 0xFFFF) const {
         if (tileIndex < 0 || !_bitmap || !canvas) return;
+
+        int localY = posY - bandY;
+        if (localY + _tileHeight < 0 || localY >= canvas->height()) return;
 
         int srcX = (tileIndex % _columns) * _tileWidth;
         int srcY = (tileIndex / _columns) * _tileHeight;
         int atlasStride = _columns * _tileWidth;
 
         for (int y = 0; y < _tileHeight; y++) {
-            for (int x = 0; x < _tileWidth; x++) {
-                uint16_t pixel = pgm_read_word(&_bitmap[(srcY + y) * atlasStride + (srcX + x)]);
-                if (pixel != transparentKey) {
-                    canvas->drawPixel(posX + x, posY + y, pixel);
+            int drawY = localY + y;
+            if (drawY >= 0 && drawY < canvas->height()) {
+                for (int x = 0; x < _tileWidth; x++) {
+                    uint16_t pixel = pgm_read_word(&_bitmap[(srcY + y) * atlasStride + (srcX + x)]);
+                    if (pixel != transparentKey) {
+                        canvas->drawPixel(posX + x, drawY, pixel);
+                    }
                 }
             }
         }
