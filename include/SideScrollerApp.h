@@ -10,13 +10,10 @@
 /**
  * Realistic Side-Scroller Platformer Benchmark Application
  * 
- * Features:
- * - Frame-rate tied scroll speeds:
- *   * Play surface / Midground: 1 pixel per 2 frames
- *   * Background Hills: 1 pixel per 8 frames
- * - 512px Tilemap wrap (16 cols * 32px) for 100% butter-smooth seamless scrolling without jumps
- * - Hero runner aligned firmly to top of ground surface (Y = 176)
+ * Performance Optimized Version:
+ * - 40 MHz Hardware SPI DMA transfers (100% hardware stable)
  * - Band-based layer culling for maximum FPS
+ * - 512px Tilemap wrap for 100% butter-smooth seamless scrolling
  */
 class SideScrollerApp {
 private:
@@ -176,7 +173,7 @@ public:
     }
 
     void render(GFXContext& gfx) {
-        // Multi-Band Render Loop (4 bands of 80px for 480x320)
+        // Multi-Band Render Loop
         int totalHeight = gfx.getHeight();
         int bandHeight  = 80;
 

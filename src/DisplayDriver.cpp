@@ -5,7 +5,7 @@ LGFX_ILI9488::LGFX_ILI9488() {
         auto cfg = _bus_instance.config();
         cfg.spi_host   = VSPI_HOST;   // Use VSPI (SPI3) on ESP32
         cfg.spi_mode   = 0;
-        cfg.freq_write = 27000000;    // 27 MHz SPI write speed (Boosted SPI DMA transfer throughput!)
+        cfg.freq_write = 40000000;    // 40 MHz SPI write speed (Optimal hardware-stable maximum for ILI9488)
         cfg.freq_read  = 16000000;
         cfg.pin_sclk   = 18;          // SCK pin (LCD CLK & Touch TCK)
         cfg.pin_mosi   = 23;          // MOSI pin (LCD SDI & Touch TDI)
