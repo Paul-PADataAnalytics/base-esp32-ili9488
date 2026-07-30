@@ -22,8 +22,7 @@
 RTC_DATA_ATTR static int rtcWakeupCount = 0;
 
 /**
- * HAL Framework & Retro Engine v1.4.2 (Full-Screen 480x320 Canvas Restoration)
- * Restores full-screen 480x320 viewport rendering for D-Pad, A/B buttons, TileMaps, and UI.
+ * HAL Framework & Retro Engine v1.4.3 (Touch X-Axis Un-Mirrored Calibration)
  */
 class AnimationApp : public BaseApp {
 
@@ -57,6 +56,10 @@ private:
     int   _highScore;
     int   _score;
 
+    int   _activeTouchX;
+    int   _activeTouchY;
+    bool  _isTouchActive;
+
 public:
     AnimationApp() 
         : _sleepManager(20, SleepMode::DEEP_SLEEP),
@@ -70,7 +73,8 @@ public:
           _coinSprite(RETRO_TILESET_32x32, 16, 16, 4, 8.0f, 0x0000),
           _bgRotation(0.0f), _bgScrollX(0.0f),
           _heroScale(2.0f), _scaleDirection(1.0f),
-          _highScore(0), _score(0) {}
+          _highScore(0), _score(0),
+          _activeTouchX(0), _activeTouchY(0), _isTouchActive(false) {}
 
     void setup(GFXContext& gfx) override {
         _sound.init();
@@ -114,7 +118,7 @@ public:
         _camera.setPosition(240, 160);
         _camera.setWorldBounds(100, 100, 380, 220);
 
-        _uiManager.showToast("v1.4 Full-Screen Engine!", 0x07FF, 3.0f);
+        _uiManager.showToast("Touch Un-Mirrored Calibrated!", 0x07FF, 3.0f);
 
         // --- Full-Screen 480x320 Multi-Layer Pipeline ---
 
@@ -174,6 +178,12 @@ public:
                 char wakeBuf[32];
                 snprintf(wakeBuf, sizeof(wakeBuf), "Wakes:%d", rtcWakeupCount);
                 gfx.drawTextDirect(wakeBuf, 15, 295, gfx.color565(0, 255, 120), 2, 0x0000);
+            }
+
+            if (_isTouchActive) {
+                char touchBuf[32];
+                snprintf(touchBuf, sizeof(touchBuf), "Touch:(%d,%d)", _activeTouchX, _activeTouchY);
+                gfx.drawTextDirect(touchBuf, 180, 295, gfx.color565(255, 255, 0), 2, 0x0000);
             }
         });
 
@@ -254,8 +264,8 @@ public:
             _sleepManager.resetInactivityTimer();
         }
 
-        int tx, ty;
-        if (gfx.getTouch(&tx, &ty)) {
+        _isTouchActive = gfx.getTouch(&_activeTouchX, &_activeTouchY);
+        if (_isTouchActive) {
             _sleepManager.resetInactivityTimer();
         }
 

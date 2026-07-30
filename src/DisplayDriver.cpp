@@ -36,8 +36,8 @@ LGFX_ILI9488::LGFX_ILI9488() {
 
     { // Touch Controller Configuration (XPT2046 on Shared Bus)
         auto cfg = _touch_instance.config();
-        cfg.x_min      = 300;
-        cfg.x_max      = 3900;
+        cfg.x_min      = 3900;        // Inverted x_min & x_max to correct mirrored X axis!
+        cfg.x_max      = 300;
         cfg.y_min      = 200;
         cfg.y_max      = 3700;
         cfg.pin_cs     = 33;          // TCS -> GPIO 33
