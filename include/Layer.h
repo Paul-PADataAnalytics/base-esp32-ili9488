@@ -86,7 +86,7 @@ public:
      * Render the layer contents
      */
     void render(GFXContext& gfx, LGFX_Sprite* buffer) {
-        if (!_visible || !_renderFunc || !buffer) return;
+        if (!_visible || !_renderFunc) return;
         _renderFunc(gfx, buffer, *this);
     }
 };
