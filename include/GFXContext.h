@@ -8,7 +8,7 @@
  * GFXContext - Hardware Abstraction Layer Drawing, Input, Image & Power API
  * 
  * Provides unified high-level 320x160 16-bit double-buffered drawing,
- * hardware DMA scaled 1.5x / 2.0x to fill full 480x320 display canvas.
+ * scaled 1.5x / 2.0x to fill full 480x320 display canvas over SPI DMA.
  */
 class GFXContext {
 private:
@@ -167,7 +167,7 @@ public:
 
     void pushBuffer() {
         if (_sprite) {
-            _sprite->pushSprite(_lcd, 0, 0);
+            _sprite->pushRotateZoom(_lcd, 240, 160, 0, 1.5f, 2.0f);
         }
     }
 };

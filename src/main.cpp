@@ -44,12 +44,8 @@ void setup() {
     // Allocate 320x160 16-bit RGB565 double-buffer sprite (102.4 KB - guaranteed fit under 114.6 KB max heap)
     spriteBuffer.setColorDepth(16);
     void* ptr = spriteBuffer.createSprite(CANVAS_W, CANVAS_H);
-    if (!ptr) {
-        Serial.println("[FRAMEWORK RETRY] Trying 240x160 allocation...");
-        ptr = spriteBuffer.createSprite(240, 160);
-    }
-
     if (ptr) {
+        spriteBuffer.setPivot(CANVAS_W / 2, CANVAS_H / 2); // Center pivot for full-screen hardware scaling
         Serial.println("[FRAMEWORK] SUCCESS: Allocated 16-bit RGB565 zero-flicker double-buffer canvas.");
     } else {
         Serial.println("[FRAMEWORK ERROR] Memory allocation failed for sprite buffer!");
