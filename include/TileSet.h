@@ -7,7 +7,7 @@
 /**
  * TileSet - High-Performance Retro Graphics Atlas Module
  * 
- * Includes exact band clipping for high-speed pushImage transfers.
+ * Includes PROGMEM safe flash reads into DRAM row buffers for crisp 16-bit color rendering.
  */
 class TileSet {
 private:
@@ -57,10 +57,16 @@ public:
 
         if (drawH <= 0) return;
 
-        // 3. Fast Row-by-Row pushImage Transfer
+        // 3. PROGMEM Safe Row-by-Row pushImage Transfer (Stack RAM Buffer)
+        uint16_t rowBuffer[64]; // Max 64px width tile
+        int copyW = (_tileWidth > 64) ? 64 : _tileWidth;
+
         for (int y = startY; y < startY + drawH; y++) {
-            const uint16_t* rowPtr = _bitmap + ((srcY + y) * atlasStride + srcX);
-            canvas->pushImage(posX, drawY + (y - startY), _tileWidth, 1, rowPtr, transparentKey);
+            int flashRowOffset = (srcY + y) * atlasStride + srcX;
+            for (int x = 0; x < copyW; x++) {
+                rowBuffer[x] = pgm_read_word(&_bitmap[flashRowOffset + x]);
+            }
+            canvas->pushImage(posX, drawY + (y - startY), copyW, 1, rowBuffer, transparentKey);
         }
     }
 };
