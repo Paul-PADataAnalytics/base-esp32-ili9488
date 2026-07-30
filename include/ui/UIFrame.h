@@ -11,11 +11,12 @@ class UIFrame : public UIWidget {
 private:
     String                 _title;
     std::vector<UIWidget*> _children;
-    int                    _scrollOffsetY = 0;
-    int                    _maxScrollY    = 0;
-    bool                   _showBorder    = true;
-    bool                   _isDragging    = false;
-    int16_t                _lastTouchY    = 0;
+    UIWidget*              _activeTouchChild = nullptr;
+    int                    _scrollOffsetY    = 0;
+    int                    _maxScrollY       = 0;
+    bool                   _showBorder       = true;
+    bool                   _isDragging       = false;
+    int16_t                _lastTouchY       = 0;
 
 public:
     UIFrame() = default;
@@ -38,6 +39,7 @@ public:
 
     void clear() {
         _children.clear();
+        _activeTouchChild = nullptr;
         _scrollOffsetY = 0;
         _maxScrollY = 0;
         markDirty();
@@ -81,7 +83,6 @@ public:
         // Render Child Widgets
         for (auto* child : _children) {
             if (child->visible) {
-                // Apply scroll offset dynamically to child drawing
                 int originalY = child->y;
                 child->y -= _scrollOffsetY;
 
@@ -99,6 +100,7 @@ public:
 
         _isDragging = true;
         _lastTouchY = ty;
+        _activeTouchChild = nullptr;
 
         // Forward to child widgets (considering scroll offset)
         int titleH = _title.length() > 0 ? 28 : 0;
@@ -111,7 +113,10 @@ public:
                     if (child->hitTest(tx, ty)) {
                         bool consumed = child->onTouchPress(tx, ty);
                         child->y = originalY;
-                        if (consumed) return true;
+                        if (consumed) {
+                            _activeTouchChild = child;
+                            return true;
+                        }
                     }
                     child->y = originalY;
                 }
@@ -123,6 +128,16 @@ public:
     bool onTouchDrag(int16_t tx, int16_t ty) override {
         if (!_isDragging) return false;
 
+        // Forward drag to active child (e.g. UISlider) if present
+        if (_activeTouchChild) {
+            int originalY = _activeTouchChild->y;
+            _activeTouchChild->y -= _scrollOffsetY;
+            bool consumed = _activeTouchChild->onTouchDrag(tx, ty);
+            _activeTouchChild->y = originalY;
+            if (consumed) return true;
+        }
+
+        // Otherwise perform container vertical scroll
         int dy = ty - _lastTouchY;
         _lastTouchY = ty;
 
@@ -139,12 +154,20 @@ public:
 
     bool onTouchRelease(int16_t tx, int16_t ty) override {
         _isDragging = false;
-        for (auto* child : _children) {
-            if (child->enabled && child->visible) {
-                int originalY = child->y;
-                child->y -= _scrollOffsetY;
-                child->onTouchRelease(tx, ty);
-                child->y = originalY;
+        if (_activeTouchChild) {
+            int originalY = _activeTouchChild->y;
+            _activeTouchChild->y -= _scrollOffsetY;
+            _activeTouchChild->onTouchRelease(tx, ty);
+            _activeTouchChild->y = originalY;
+            _activeTouchChild = nullptr;
+        } else {
+            for (auto* child : _children) {
+                if (child->enabled && child->visible) {
+                    int originalY = child->y;
+                    child->y -= _scrollOffsetY;
+                    child->onTouchRelease(tx, ty);
+                    child->y = originalY;
+                }
             }
         }
         return true;

@@ -1,6 +1,7 @@
 #ifndef UI_SLIDER_H
 #define UI_SLIDER_H
 
+#include <cmath>
 #include <functional>
 #include "UIWidget.h"
 
@@ -37,7 +38,8 @@ public:
     void setValue(float v) {
         if (v < _minVal) v = _minVal;
         if (v > _maxVal) v = _maxVal;
-        if (_val != v) {
+        // Threshold check (0.5% change minimum) to prevent touch jitter flooding Lua callbacks
+        if (std::abs(_val - v) >= 0.005f * (_maxVal - _minVal) || v == _minVal || v == _maxVal) {
             _val = v;
             if (_binding) *_binding = _val;
             if (_onChange) _onChange(_val);
@@ -82,7 +84,7 @@ public:
             if (_showValue) {
                 char valStr[16];
                 snprintf(valStr, sizeof(valStr), "%.2f", _val);
-                drawRightText(buf, bandY, x, y, w, labelHeight, 0, valStr, theme.textSecondary, theme.fontMono);
+                drawRightText(buf, bandY, x, y, w, labelHeight, 0, valStr, theme.textSecondary, theme.fontBody);
             }
         }
 
