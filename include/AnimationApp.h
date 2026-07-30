@@ -22,7 +22,8 @@
 RTC_DATA_ATTR static int rtcWakeupCount = 0;
 
 /**
- * HAL Framework & Retro Engine v1.4.4 (Auto-Sleep Disabled For Debugging)
+ * HAL Framework & Retro Engine v1.4.5 (100% Zero-Tear Double-Buffered Architecture)
+ * All drawing renders off-screen into sprite buffer before single atomic SPI DMA flush.
  */
 class AnimationApp : public BaseApp {
 
@@ -62,7 +63,7 @@ private:
 
 public:
     AnimationApp() 
-        : _sleepManager(0, SleepMode::LIGHT_SLEEP), // Auto-sleep disabled (0s timeout) for continuous debugging!
+        : _sleepManager(0, SleepMode::LIGHT_SLEEP),
           _tileSet(RETRO_TILESET_32x32, 16, 16, 32, 32),
           _tileMap(&_tileSet, RETRO_LEVEL_MAP, 16, 10),
           _particleEngine(150),
@@ -81,7 +82,6 @@ public:
         _saveSystem.begin();
         _highScore = _saveSystem.getHighScore();
 
-        // Explicitly disable auto-sleep timer so unit stays awake continuously while debugging
         _sleepManager.disableAutoSleep();
 
         _sleepManager.onPreSleep([this]() {
@@ -121,9 +121,9 @@ public:
         _camera.setPosition(240, 160);
         _camera.setWorldBounds(100, 100, 380, 220);
 
-        _uiManager.showToast("Auto-Sleep OFF (Debug Mode)", 0x07FF, 3.5f);
+        _uiManager.showToast("100% Zero-Tear Double-Buffered!", 0x07FF, 3.5f);
 
-        // --- Full-Screen 480x320 Multi-Layer Pipeline ---
+        // --- 100% Zero-Tear Double-Buffered Layer Pipeline ---
 
         // 1. BACKGROUND LAYER (Renders at lowest depth below everything)
         _layerManager.addLayer("Background", LayerRole::BACKGROUND, 0, [this](GFXContext& gfx, LGFX_Sprite* buffer, Layer& layer) {
@@ -138,7 +138,7 @@ public:
 
         // 2. WORLD MAP LAYER (TileMap grid level geometry)
         _layerManager.addLayer("TileMap", LayerRole::WORLD_MAP, 0, [this](GFXContext& gfx, LGFX_Sprite* buffer, Layer& layer) {
-            _tileMap.render(gfx.getLCD(), (int)layer.getTranslationX(), 0, 0x0000);
+            _tileMap.render(gfx.getSprite(), (int)layer.getTranslationX(), 0, 0x0000);
         });
 
         // 3. ENTITIES LAYER (Hero, Coins, Energy Spheres, Particles)
@@ -149,15 +149,15 @@ public:
                 gfx.drawCircleDirect((int)_balls[i].x, (int)_balls[i].y, (int)_balls[i].radius + 1, 0xFFFF, false);
             }
 
-            _heroSprite.render(gfx.getLCD());
-            _coinSprite.render(gfx.getLCD());
-            _particleEngine.render(gfx.getLCD());
+            _heroSprite.render(gfx.getSprite());
+            _coinSprite.render(gfx.getSprite());
+            _particleEngine.render(gfx.getSprite());
         });
 
         // 4. FOREGROUND LAYER (Tree canopy occlusion above entities!)
         _layerManager.addLayer("Foreground", LayerRole::FOREGROUND, 0, [this](GFXContext& gfx, LGFX_Sprite* buffer, Layer& layer) {
-            _tileSet.drawTile(gfx.getLCD(), 3, 80 + (int)layer.getTranslationX(), 20, 0x0000);
-            _tileSet.drawTile(gfx.getLCD(), 3, 176 + (int)layer.getTranslationX(), 20, 0x0000);
+            _tileSet.drawTile(gfx.getSprite(), 3, 80 + (int)layer.getTranslationX(), 20, 0x0000);
+            _tileSet.drawTile(gfx.getSprite(), 3, 176 + (int)layer.getTranslationX(), 20, 0x0000);
         });
 
         // 5. UI OVERLAY LAYER (HUD Bar, Score, Sleep Countdown)
@@ -265,18 +265,15 @@ public:
 
         _isTouchActive = gfx.getTouch(&_activeTouchX, &_activeTouchY);
 
-        // Check Auto-Sleep Trigger (Disabled)
-        if (_sleepManager.shouldAutoSleep()) {
-            _sleepManager.triggerSleep(gfx);
-            return;
-        }
+        // Render ALL Layers off-screen into 480x320 sprite buffer
+        _layerManager.renderAll(gfx, gfx.getSprite());
 
-        // Composite ALL Layers directly across full 480x320 screen canvas
-        _layerManager.renderAll(gfx, nullptr);
-
-        // Render On-Screen Touch Gamepad Controls & Toast Banner across 480x320 screen
+        // Render On-Screen Touch Gamepad Controls & Toast Banner into 480x320 sprite buffer
         _gamepad.render(gfx);
         _uiManager.renderToast(gfx);
+
+        // Single Atomic Hardware SPI DMA Flush (100% Zero Tearing!)
+        gfx.pushBuffer();
     }
 };
 

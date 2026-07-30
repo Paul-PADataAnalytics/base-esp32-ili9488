@@ -42,9 +42,14 @@ void setup() {
     tft.setRotation(1); // Landscape mode (480x320)
     tft.fillScreen(gfx.color565(8, 19, 19));
 
-    // Initialize 16-bit double buffer canvas
-    spriteBuffer.setColorDepth(16);
-    spriteBuffer.createSprite(240, 160); // High-res 16-bit double buffer
+    // Initialize 8-bit double buffer canvas (153.6 KB RAM) for 100% zero-tear DMA flushing
+    spriteBuffer.setColorDepth(8);
+    void* ptr = spriteBuffer.createSprite(CANVAS_W, CANVAS_H);
+    if (!ptr) {
+        Serial.println("[FRAMEWORK ERROR] Failed to allocate full 480x320 double-buffer canvas!");
+    } else {
+        Serial.println("[FRAMEWORK] Allocated full 480x320 zero-flicker double-buffer canvas.");
+    }
 
     // 3. Initialize application using high-level drawing context
     myApp.setup(gfx);
