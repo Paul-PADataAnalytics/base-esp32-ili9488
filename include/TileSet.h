@@ -7,7 +7,7 @@
 /**
  * TileSet - High-Performance Retro Graphics Atlas Module
  * 
- * Uses LovyanGFX fast-path block pushImage transfers instead of pixel loops.
+ * Includes exact band clipping for high-speed pushImage transfers.
  */
 class TileSet {
 private:
@@ -31,25 +31,36 @@ public:
         if (tileIndex < 0 || !_bitmap || !canvas) return;
 
         int localY = posY - bandY;
-        if (localY + _tileHeight < 0 || localY >= canvas->height()) return;
+        int canvasH = canvas->height();
+
+        // 1. Full Vertical Culling Check
+        if (localY + _tileHeight <= 0 || localY >= canvasH) return;
 
         int srcX = (tileIndex % _columns) * _tileWidth;
         int srcY = (tileIndex / _columns) * _tileHeight;
         int atlasStride = _columns * _tileWidth;
 
-        // Use fast-path block pointer if tile is contiguous in PROGMEM
-        if (srcX == 0 && _columns == 1) {
-            const uint16_t* tilePtr = _bitmap + (srcY * atlasStride);
-            canvas->pushImage(posX, localY, _tileWidth, _tileHeight, tilePtr, transparentKey);
-        } else {
-            // High-speed row-by-row block copy (eliminates 1024 drawPixel calls per tile!)
-            for (int y = 0; y < _tileHeight; y++) {
-                int drawY = localY + y;
-                if (drawY >= 0 && drawY < canvas->height()) {
-                    const uint16_t* rowPtr = _bitmap + ((srcY + y) * atlasStride + srcX);
-                    canvas->pushImage(posX, drawY, _tileWidth, 1, rowPtr, transparentKey);
-                }
-            }
+        // 2. High-Speed Band Clipping Logic
+        int startY = 0;
+        int drawY  = localY;
+        int drawH  = _tileHeight;
+
+        if (localY < 0) {
+            startY = -localY;
+            drawY  = 0;
+            drawH  -= startY;
+        }
+
+        if (drawY + drawH > canvasH) {
+            drawH = canvasH - drawY;
+        }
+
+        if (drawH <= 0) return;
+
+        // 3. Fast Row-by-Row pushImage Transfer
+        for (int y = startY; y < startY + drawH; y++) {
+            const uint16_t* rowPtr = _bitmap + ((srcY + y) * atlasStride + srcX);
+            canvas->pushImage(posX, drawY + (y - startY), _tileWidth, 1, rowPtr, transparentKey);
         }
     }
 };
