@@ -10,10 +10,10 @@
 /**
  * Realistic Side-Scroller Platformer Benchmark Application
  * 
- * Includes:
- * - 4-Band 480x80 16-Bit RGB565 Double-Buffering (76.8 KB RAM, 0% Flicker)
+ * Features:
+ * - 6-Tile Atlas (Grass Top, Deep Dirt, Hill Crest, Hill Base, Hill Left Slope, Hill Right Slope)
+ * - Seamless screen bottom fill eliminating corrupt edge gaps
  * - Hero runner aligned firmly to top of ground surface (Y = 176)
- * - Continuous hill base extending down to ground
  * - Band-based layer culling for maximum FPS
  */
 class SideScrollerApp {
@@ -36,9 +36,9 @@ private:
 
 public:
     SideScrollerApp() 
-        : _dirtTileSet(DIRT_TILESET_32x32, 32, 32, 32, 128),
+        : _dirtTileSet(DIRT_TILESET_32x32, 32, 32, 32, 192),
           _dirtMap(&_dirtTileSet, PLAY_SURFACE_MAP, 16, 10),
-          _hillsTileSet(DIRT_TILESET_32x32, 32, 32, 32, 128),
+          _hillsTileSet(DIRT_TILESET_32x32, 32, 32, 32, 192),
           _hillsMap(&_hillsTileSet, HILLS_BACKGROUND_MAP, 16, 10),
           _bgScrollX(0.0f), _mgScrollX(0.0f), _fgScrollX(0.0f),
           _heroFrame(0), _frameCounter(0), _score(0) {}
