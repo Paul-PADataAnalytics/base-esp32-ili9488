@@ -5,9 +5,9 @@
 #include <LovyanGFX.hpp>
 
 /**
- * TileSet - High-Performance Retro Graphics Atlas Module
+ * TileSet - High-Performance Direct-Memory Pixel Blitter Module
  * 
- * Direct 16-bit RGB565 PROGMEM tile renderer without double byte-swapping.
+ * Writes 16-bit RGB565 PROGMEM tile pixels directly into sprite RAM buffer.
  */
 class TileSet {
 private:
@@ -57,24 +57,26 @@ public:
 
         if (drawH <= 0) return;
 
-        // 3. Fast Row Transfer into Sprite Buffer (Native Host Byte Order)
-        uint16_t rowBuffer[64];
-        int copyW = (_tileWidth > 64) ? 64 : _tileWidth;
+        // 3. Direct RAM Pointer Writing to 16-Bit RGB565 Sprite Buffer
+        LGFX_Sprite* sprite = (LGFX_Sprite*)canvas;
+        uint16_t* buf = (uint16_t*)sprite->getBuffer();
+        if (!buf) return;
+
+        int canvasW = canvas->width();
 
         for (int y = startY; y < startY + drawH; y++) {
             int flashRowOffset = (srcY + y) * atlasStride + srcX;
             int destY = drawY + (y - startY);
+            int destRowOffset = destY * canvasW;
 
-            for (int x = 0; x < copyW; x++) {
-                rowBuffer[x] = pgm_read_word(&_bitmap[flashRowOffset + x]);
-            }
-
-            if (transparentKey == 0xFFFF) {
-                // Solid tile blit (Opaque grass & dirt tiles)
-                canvas->pushImage(posX, destY, copyW, 1, rowBuffer);
-            } else {
-                // Transparent tile blit (Rolling hills & pine trees)
-                canvas->pushImage(posX, destY, copyW, 1, rowBuffer, transparentKey);
+            for (int x = 0; x < _tileWidth; x++) {
+                int destX = posX + x;
+                if (destX >= 0 && destX < canvasW) {
+                    uint16_t pixel = pgm_read_word(&_bitmap[flashRowOffset + x]);
+                    if (pixel != transparentKey) {
+                        buf[destRowOffset + destX] = pixel;
+                    }
+                }
             }
         }
     }
