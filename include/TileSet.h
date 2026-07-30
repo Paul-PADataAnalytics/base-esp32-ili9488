@@ -7,7 +7,7 @@
 /**
  * TileSet - High-Performance Retro Graphics Atlas Module
  * 
- * Direct 16-bit RGB565 PROGMEM tile renderer with explicit transparency masking.
+ * Uses LovyanGFX pushImage RGB565 raw block transfers to preserve 16-bit colors.
  */
 class TileSet {
 private:
@@ -57,7 +57,7 @@ public:
 
         if (drawH <= 0) return;
 
-        // 3. Fast Row Transfer into Sprite Buffer
+        // 3. Fast Row Transfer into Sprite Buffer (Preserves True 16-Bit RGB565 via pushImage)
         uint16_t rowBuffer[64];
         int copyW = (_tileWidth > 64) ? 64 : _tileWidth;
 
@@ -66,11 +66,11 @@ public:
             int destY = drawY + (y - startY);
 
             for (int x = 0; x < copyW; x++) {
-                uint16_t pixel = pgm_read_word(&_bitmap[flashRowOffset + x]);
-                if (pixel != transparentKey) {
-                    canvas->drawPixel(posX + x, destY, pixel);
-                }
+                rowBuffer[x] = pgm_read_word(&_bitmap[flashRowOffset + x]);
             }
+
+            // High-speed native RGB565 row blit
+            canvas->pushImage(posX, destY, copyW, 1, rowBuffer);
         }
     }
 };
