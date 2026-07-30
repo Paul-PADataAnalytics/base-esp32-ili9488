@@ -10,14 +10,15 @@
 
 // Instantiate Global Drivers
 static LGFX_ILI9488 tft;
-static LGFX_Sprite  spriteBuffer(&tft);
+static LGFX_Sprite  spriteBuffer0(&tft);   // Band buffer A (DMA double-buffer slot 0)
+static LGFX_Sprite  spriteBuffer1(&tft);   // Band buffer B (DMA double-buffer slot 1)
 
-// Native 480x320 Viewport & 480x80 Band Buffer (76.8 KB RAM)
+// Native 480x320 Viewport & 480x80 Band Buffer (76.8 KB RAM each)
 const int CANVAS_W = 480;
 const int CANVAS_H = 320;
 const int BAND_H   = 80;
 
-static GFXContext gfx(&tft, &spriteBuffer, 0, 0, CANVAS_W, CANVAS_H);
+static GFXContext gfx(&tft, &spriteBuffer0, &spriteBuffer1, 0, 0, CANVAS_W, CANVAS_H);
 static SideScrollerApp myApp;
 
 unsigned long lastFrameTime = 0;
@@ -42,14 +43,24 @@ void setup() {
     tft.setRotation(1); // Landscape mode (480x320 native resolution)
     tft.fillScreen(tft.color565(135, 206, 235));
 
-    // Allocate 480x80 16-bit RGB565 band buffer (76.8 KB RAM)
-    spriteBuffer.setColorDepth(16);
-    void* ptr = spriteBuffer.createSprite(CANVAS_W, BAND_H);
-    if (ptr) {
-        Serial.println("[BENCHMARK] SUCCESS: Allocated 480x80 16-bit RGB565 band buffer (76.8 KB).");
+    // Allocate TWO 480x80 16-bit RGB565 band buffers for DMA double-buffering
+    spriteBuffer0.setColorDepth(16);
+    void* ptr0 = spriteBuffer0.createSprite(CANVAS_W, BAND_H);
+    if (ptr0) {
+        Serial.printf("[BENCHMARK] SUCCESS: Band buffer A allocated (%d bytes).\n", CANVAS_W * BAND_H * 2);
     } else {
-        Serial.println("[BENCHMARK ERROR] Band buffer allocation failed!");
+        Serial.println("[BENCHMARK ERROR] Band buffer A allocation FAILED!");
     }
+
+    spriteBuffer1.setColorDepth(16);
+    void* ptr1 = spriteBuffer1.createSprite(CANVAS_W, BAND_H);
+    if (ptr1) {
+        Serial.printf("[BENCHMARK] SUCCESS: Band buffer B allocated (%d bytes).\n", CANVAS_W * BAND_H * 2);
+    } else {
+        Serial.println("[BENCHMARK ERROR] Band buffer B allocation FAILED! Falling back to single-buffer.");
+    }
+
+    Serial.printf("[BENCHMARK MEMORY] After buffers - Free Heap: %d bytes\n", ESP.getFreeHeap());
 
     // 3. Initialize application using high-level drawing context
     myApp.setup(gfx);
@@ -68,7 +79,7 @@ void loop() {
     // 1. Benchmark Physics & Animation Update
     myApp.update(deltaTime);
 
-    // 2. Benchmark Multi-Band 0% Flicker Render Pass (microsecond-timed)
+    // 2. Benchmark Multi-Band Render with DMA Double-Buffering + Dirty-Rect
     unsigned long renderStart = micros();
     myApp.render(gfx);
     unsigned long renderUs = micros() - renderStart;
