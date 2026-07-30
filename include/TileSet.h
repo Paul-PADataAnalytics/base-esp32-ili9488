@@ -7,7 +7,7 @@
 /**
  * TileSet - High-Performance Direct-Memory Pixel Blitter Module
  * 
- * Writes 16-bit RGB565 PROGMEM tile pixels directly into sprite RAM buffer.
+ * Writes byte-swapped 16-bit RGB565 pixels directly into sprite RAM for ILI9488 SPI DMA.
  */
 class TileSet {
 private:
@@ -74,7 +74,8 @@ public:
                 if (destX >= 0 && destX < canvasW) {
                     uint16_t pixel = pgm_read_word(&_bitmap[flashRowOffset + x]);
                     if (pixel != transparentKey) {
-                        buf[destRowOffset + destX] = pixel;
+                        // Byte swap for ILI9488 SPI DMA transmission
+                        buf[destRowOffset + destX] = (pixel >> 8) | (pixel << 8);
                     }
                 }
             }
