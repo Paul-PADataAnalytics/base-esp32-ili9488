@@ -12,13 +12,6 @@
 
 /**
  * SideScrollerApp - Realistic Platformer Benchmark Application
- * 
- * Features:
- * - Parallax Background Layer: Rolling hills moving at 4 px/sec
- * - Play Surface Layer: Dirt & grass tiles moving at 8 px/sec
- * - Foreground UI Layer: 5-digit score counter incrementing by 1 per frame
- * - Animated Hero: 8-frame Army Runner (updates frame every 2 game frames)
- * - Collectible Pickup: Floating star moving at 8 px/sec above player height
  */
 class SideScrollerApp : public BaseApp {
 
@@ -69,8 +62,9 @@ public:
 
         // 1. BACKGROUND LAYER (Rolling Hills moving at 4 px/sec)
         _layerManager.addLayer("BackgroundHills", LayerRole::BACKGROUND, 0, [this](GFXContext& gfx, LGFX_Sprite* buffer, Layer& layer) {
-            gfx.fillScreen(gfx.color565(135, 206, 235)); // Sky Blue
+            gfx.fillScreen(gfx.color565(135, 206, 235)); // Sky Blue Background
             int offset = (int)_bgScrollX % 32;
+            // Hills use transparent key 0x0000 (C_TRANS) to let sky blue show through
             _hillsMap.render(gfx.getSprite(), offset, 0, gfx.getBandY(), C_TRANS);
             _hillsMap.render(gfx.getSprite(), offset + 480, 0, gfx.getBandY(), C_TRANS);
         });
@@ -78,8 +72,9 @@ public:
         // 2. MIDGROUND LAYER (Play Surface Dirt Moving at 8 px/sec)
         _layerManager.addLayer("PlaySurface", LayerRole::WORLD_MAP, 0, [this](GFXContext& gfx, LGFX_Sprite* buffer, Layer& layer) {
             int offset = (int)_mgScrollX % 32;
-            _dirtMap.render(gfx.getSprite(), offset, 0, gfx.getBandY(), C_TRANS);
-            _dirtMap.render(gfx.getSprite(), offset + 480, 0, gfx.getBandY(), C_TRANS);
+            // Dirt surface uses solid opaque blit (0xFFFF)
+            _dirtMap.render(gfx.getSprite(), offset, 0, gfx.getBandY(), 0xFFFF);
+            _dirtMap.render(gfx.getSprite(), offset + 480, 0, gfx.getBandY(), 0xFFFF);
         });
 
         // 3. ENTITIES LAYER (Army Hero & Floating Pickup Star)

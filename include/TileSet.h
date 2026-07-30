@@ -7,7 +7,7 @@
 /**
  * TileSet - High-Performance Retro Graphics Atlas Module
  * 
- * Uses LovyanGFX pushImage RGB565 raw block transfers to preserve 16-bit colors.
+ * Corrects LovyanGFX SPI byte-ordering to restore true 16-bit RGB565 tile colors.
  */
 class TileSet {
 private:
@@ -27,7 +27,7 @@ public:
     int getColumns() const { return _columns; }
     int getRows() const { return _rows; }
 
-    void drawTile(LovyanGFX* canvas, int tileIndex, int posX, int posY, int bandY = 0, uint16_t transparentKey = 0x0000) const {
+    void drawTile(LovyanGFX* canvas, int tileIndex, int posX, int posY, int bandY = 0, uint16_t transparentKey = 0xFFFF) const {
         if (tileIndex < 0 || !_bitmap || !canvas) return;
 
         int localY = posY - bandY;
@@ -57,7 +57,7 @@ public:
 
         if (drawH <= 0) return;
 
-        // 3. Fast Row Transfer into Sprite Buffer (Preserves True 16-Bit RGB565 via pushImage)
+        // 3. Fast Row Transfer into Sprite Buffer with Byte-Swap Correction
         uint16_t rowBuffer[64];
         int copyW = (_tileWidth > 64) ? 64 : _tileWidth;
 
@@ -66,11 +66,18 @@ public:
             int destY = drawY + (y - startY);
 
             for (int x = 0; x < copyW; x++) {
-                rowBuffer[x] = pgm_read_word(&_bitmap[flashRowOffset + x]);
+                uint16_t rawPixel = pgm_read_word(&_bitmap[flashRowOffset + x]);
+                // Byte-swap for LovyanGFX 16-bit RGB565 sprite buffer
+                rowBuffer[x] = (rawPixel >> 8) | (rawPixel << 8);
             }
 
-            // High-speed native RGB565 row blit
-            canvas->pushImage(posX, destY, copyW, 1, rowBuffer);
+            if (transparentKey == 0xFFFF) {
+                // Solid tile blit (Opaque grass & dirt tiles)
+                canvas->pushImage(posX, destY, copyW, 1, rowBuffer);
+            } else {
+                // Transparent tile blit (Rolling hills & pine trees)
+                canvas->pushImage(posX, destY, copyW, 1, rowBuffer, transparentKey);
+            }
         }
     }
 };

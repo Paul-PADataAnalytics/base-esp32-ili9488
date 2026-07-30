@@ -51,6 +51,13 @@ void setup() {
         Serial.println("[BENCHMARK ERROR] Band buffer allocation failed!");
     }
 
+    // Diagnostic Direct Tile Pixel Test
+    Serial.println("[DIAGNOSTIC] Testing PROGMEM tile pixel values:");
+    for (int i = 0; i < 10; i++) {
+        uint16_t p = pgm_read_word(&DIRT_TILESET_32x32[i]);
+        Serial.printf("Pixel %d: 0x%04X\n", i, p);
+    }
+
     // 3. Initialize application using high-level drawing context
     myApp.setup(gfx);
 
