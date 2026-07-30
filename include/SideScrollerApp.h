@@ -8,13 +8,28 @@
 #include "SideScrollerAssets.h"
 
 /**
- * Realistic Side-Scroller Platformer Benchmark Application
+ * SideScrollerApp - Realistic Side-Scroller Platformer Benchmark Application
  *
- * Performance Optimizations Active:
- * 1. 40 MHz Hardware SPI DMA transfers (hardware-stable maximum)
- * 2. DRAM Tile Atlas Cache (12 KB) - eliminates pgm_read_word() SPI flash reads
- * 3. Dirty-Rectangle Band Tracking - skips re-render + re-push for unchanged bands
- * 4. DMA Double-Buffering - CPU renders band N+1 while SPI transfers band N
+ * ## Responsibility
+ * This class is responsible ONLY for game logic and content:
+ *   - Declaring layers with their Y-ranges and render callbacks.
+ *   - Calling layer->markDirty() when a layer's content changes.
+ *   - Calling gfx.renderBands() once per frame.
+ *
+ * ## What this class does NOT contain
+ * No SPI bus management, no band loop, no dirty-flag arithmetic, no DMA
+ * orchestration. All of that lives in GFXContext::renderBands() and
+ * LayerManager::computeBandDirtyFlags() and is fully reusable.
+ *
+ * ## Scroll Rates (Benchmark-Frozen)
+ *   - Foreground / play surface: 1 pixel per 2 frames
+ *   - Background / parallax hills: 1 pixel per 8 frames
+ *
+ * ## Y-Layout (Benchmark-Frozen, 480x320 canvas, 80px bands)
+ *   Band 0  Y=0..79    Sky + parallax hills + HUD score
+ *   Band 1  Y=80..159  Sky + hero runner (top half)
+ *   Band 2  Y=160..239 Ground tiles + hero runner (bottom half) + star
+ *   Band 3  Y=240..319 Ground tiles (deep dirt)
  */
 class SideScrollerApp {
 private:
@@ -22,28 +37,22 @@ private:
 
     TileSet _dirtTileSet;
     TileMap _dirtMap;
-
     TileSet _hillsTileSet;
     TileMap _hillsMap;
 
     int _bgScrollX;
     int _mgScrollX;
     int _fgScrollX;
-
     int _heroFrame;
     int _animFrameCounter;
     int _scrollFrameCounter;
     int _score;
 
-    // --- Dirty-Rect Tracking ---
-    // Per-band dirty state: true = needs re-render + push this frame
-    bool _bandDirty[4];
-
-    // Last rendered value of each tracked variable, per band
-    int _lastBgScrollX;    // Tracks when Band 0 & 1 background changes
-    int _lastMgScrollX;    // Tracks when Band 2 & 3 foreground changes
-    int _lastHeroFrame;    // Tracks when hero sprite changes (Bands 1 & 2)
-    int _lastScore;        // Tracks when HUD score changes (Band 0)
+    // Cached layer pointers set in setup() for fast markDirty() calls in update()
+    Layer* _layerBg;
+    Layer* _layerGround;
+    Layer* _layerEntities;
+    Layer* _layerHUD;
 
 public:
     SideScrollerApp()
@@ -53,212 +62,168 @@ public:
           _hillsMap(&_hillsTileSet, HILLS_BACKGROUND_MAP, 16, 10),
           _bgScrollX(0), _mgScrollX(0), _fgScrollX(0),
           _heroFrame(0), _animFrameCounter(0), _scrollFrameCounter(0), _score(0),
-          _lastBgScrollX(-1), _lastMgScrollX(-1), _lastHeroFrame(-1), _lastScore(-1)
-    {
-        for (int i = 0; i < 4; i++) _bandDirty[i] = true; // Force full render on first frame
-    }
+          _layerBg(nullptr), _layerGround(nullptr),
+          _layerEntities(nullptr), _layerHUD(nullptr)
+    {}
 
     void setup(GFXContext& gfx) {
         _layerManager.clearLayers();
 
-        // Layer 0: Sky & Parallax Rolling Hills (background, 1px per 8 frames)
+        // ------------------------------------------------------------------
+        // Layer 0: Sky & Parallax Rolling Hills
+        //   Y-range: 0..192 (sky fills top 6 bands of map; hill base at Y=192)
+        //   Dirty when: bgScrollX changes (every 8 frames)
+        // ------------------------------------------------------------------
         _layerManager.addLayer("BackgroundHills", LayerRole::BACKGROUND, 0,
-            [this](GFXContext& gfx, LGFX_Sprite* buffer, Layer& layer) {
+            [this](GFXContext& gfx, LGFX_Sprite* buf, Layer& layer) {
                 int bandY = gfx.getBandY();
                 if (bandY >= 192) return;
 
-                buffer->fillScreen(gfx.color565(135, 206, 235));
-
+                buf->fillScreen(gfx.color565(135, 206, 235));
                 int offset = _bgScrollX % 512;
                 if (offset > 0) offset -= 512;
+                _hillsMap.render(buf, offset,       0, bandY, C_TRANS);
+                _hillsMap.render(buf, offset + 512, 0, bandY, C_TRANS);
+            },
+            /*minDrawY=*/ 0, /*maxDrawY=*/ 192);
+        _layerBg = _layerManager.getLayer("BackgroundHills");
 
-                _hillsMap.render(buffer, offset,       0, bandY, C_TRANS);
-                _hillsMap.render(buffer, offset + 512, 0, bandY, C_TRANS);
-            });
-
-        // Layer 1: Midground Play Surface Dirt & Grass Tiles (1px per 2 frames)
+        // ------------------------------------------------------------------
+        // Layer 1: Midground Play Surface (Dirt & Grass Tiles)
+        //   Y-range: 160..320 (grass row starts at map row 6, Y=192; dirt fills below)
+        //   Dirty when: mgScrollX changes (every 2 frames)
+        // ------------------------------------------------------------------
         _layerManager.addLayer("PlaySurface", LayerRole::WORLD_MAP, 0,
-            [this](GFXContext& gfx, LGFX_Sprite* buffer, Layer& layer) {
+            [this](GFXContext& gfx, LGFX_Sprite* buf, Layer& layer) {
                 int bandY = gfx.getBandY();
                 if (bandY < 160) return;
 
                 int offset = _mgScrollX % 512;
                 if (offset > 0) offset -= 512;
+                _dirtMap.render(buf, offset,       0, bandY, 0xFFFF);
+                _dirtMap.render(buf, offset + 512, 0, bandY, 0xFFFF);
+            },
+            /*minDrawY=*/ 160, /*maxDrawY=*/ 320);
+        _layerGround = _layerManager.getLayer("PlaySurface");
 
-                _dirtMap.render(buffer, offset,       0, bandY, 0xFFFF);
-                _dirtMap.render(buffer, offset + 512, 0, bandY, 0xFFFF);
-            });
-
-        // Layer 2: Animated Hero Runner & Floating Collectible Star
+        // ------------------------------------------------------------------
+        // Layer 2: Entities — Animated Hero Runner & Floating Collectible Star
+        //   Y-range: 80..240 (hero is 32px tall scaled 2x at Y=176..208; star at Y=145..161)
+        //   Dirty when: heroFrame changes (every 2 frames) or mgScrollX changes
+        // ------------------------------------------------------------------
         _layerManager.addLayer("Entities", LayerRole::ENTITIES, 0,
-            [this](GFXContext& gfx, LGFX_Sprite* buffer, Layer& layer) {
+            [this](GFXContext& gfx, LGFX_Sprite* buf, Layer& layer) {
                 int bandY = gfx.getBandY();
                 if (bandY < 80 || bandY >= 240) return;
 
-                // A. Floating Gold Star
+                // A. Floating Gold Star Pickup
                 int starX = 360 + (_fgScrollX % 512);
                 if (starX < -16) starX += 512;
-
                 for (int sy = 0; sy < 16; sy++) {
                     int destY = 145 + sy - bandY;
-                    if (destY >= 0 && destY < buffer->height()) {
-                        for (int sx = 0; sx < 16; sx++) {
-                            uint16_t p = pgm_read_word(&PICKUP_STAR_16x16[sy * 16 + sx]);
-                            if (p != C_TRANS) {
-                                int destX = starX + sx;
-                                if (destX >= 0 && destX < buffer->width()) {
-                                    uint16_t* b = (uint16_t*)buffer->getBuffer();
-                                    b[destY * buffer->width() + destX] = (p >> 8) | (p << 8);
-                                }
-                            }
-                        }
+                    if (destY < 0 || destY >= buf->height()) continue;
+                    for (int sx = 0; sx < 16; sx++) {
+                        uint16_t p = pgm_read_word(&PICKUP_STAR_16x16[sy * 16 + sx]);
+                        if (p == C_TRANS) continue;
+                        int destX = starX + sx;
+                        if (destX < 0 || destX >= buf->width()) continue;
+                        uint16_t* b = (uint16_t*)buf->getBuffer();
+                        b[destY * buf->width() + destX] = (p >> 8) | (p << 8);
                     }
                 }
 
-                // B. Hero Runner (2x scaled, centered at X=240, ground at Y=192)
+                // B. Hero Runner (2x scale, centred at X=240, ground contact Y=192)
                 const uint16_t* framePtr = &ARMY_RUNNER_8FRAMES[_heroFrame * 16 * 16];
                 for (int hy = 0; hy < 16; hy++) {
-                    for (int scaleY = 0; scaleY < 2; scaleY++) {
-                        int destY = 176 + (hy * 2 + scaleY) - bandY;
-                        if (destY >= 0 && destY < buffer->height()) {
-                            for (int hx = 0; hx < 16; hx++) {
-                                uint16_t p = pgm_read_word(&framePtr[hy * 16 + hx]);
-                                if (p != C_TRANS) {
-                                    for (int scaleX = 0; scaleX < 2; scaleX++) {
-                                        int destX = 240 + (hx * 2 + scaleX) - 16;
-                                        if (destX >= 0 && destX < buffer->width()) {
-                                            uint16_t* b = (uint16_t*)buffer->getBuffer();
-                                            b[destY * buffer->width() + destX] = (p >> 8) | (p << 8);
-                                        }
-                                    }
-                                }
+                    for (int sy = 0; sy < 2; sy++) {
+                        int destY = 176 + hy * 2 + sy - bandY;
+                        if (destY < 0 || destY >= buf->height()) continue;
+                        for (int hx = 0; hx < 16; hx++) {
+                            uint16_t p = pgm_read_word(&framePtr[hy * 16 + hx]);
+                            if (p == C_TRANS) continue;
+                            for (int sx = 0; sx < 2; sx++) {
+                                int destX = 240 + hx * 2 + sx - 16;
+                                if (destX < 0 || destX >= buf->width()) continue;
+                                uint16_t* b = (uint16_t*)buf->getBuffer();
+                                b[destY * buf->width() + destX] = (p >> 8) | (p << 8);
                             }
                         }
                     }
                 }
-            });
+            },
+            /*minDrawY=*/ 80, /*maxDrawY=*/ 240);
+        _layerEntities = _layerManager.getLayer("Entities");
 
-        // Layer 3: Foreground HUD Score Box (Band 0 only)
+        // ------------------------------------------------------------------
+        // Layer 3: Foreground HUD — Score Box
+        //   Y-range: 0..50 (score box sits in top-left, 42px tall including border)
+        //   Dirty when: score changes (every frame)
+        // ------------------------------------------------------------------
         _layerManager.addLayer("ForegroundHUD", LayerRole::UI_OVERLAY, 0,
-            [this](GFXContext& gfx, LGFX_Sprite* buffer, Layer& layer) {
-                int bandY = gfx.getBandY();
-                if (bandY != 0) return;
-
-                buffer->fillRect(10, 10, 150, 32, gfx.color565(20, 30, 50));
-                buffer->drawRect(10, 10, 150, 32, gfx.color565(255, 215, 0));
-
+            [this](GFXContext& gfx, LGFX_Sprite* buf, Layer& layer) {
+                if (gfx.getBandY() != 0) return;
+                buf->fillRect(10, 10, 150, 32, gfx.color565(20, 30, 50));
+                buf->drawRect(10, 10, 150, 32, gfx.color565(255, 215, 0));
                 char scoreStr[16];
                 snprintf(scoreStr, sizeof(scoreStr), "SCORE:%05d", _score);
-                buffer->setTextColor(gfx.color565(255, 255, 255));
-                buffer->setTextSize(2);
-                buffer->setCursor(18, 18);
-                buffer->print(scoreStr);
-            });
+                buf->setTextColor(gfx.color565(255, 255, 255));
+                buf->setTextSize(2);
+                buf->setCursor(18, 18);
+                buf->print(scoreStr);
+            },
+            /*minDrawY=*/ 0, /*maxDrawY=*/ 50);
+        _layerHUD = _layerManager.getLayer("ForegroundHUD");
     }
 
+    // ------------------------------------------------------------------------
+    // update() — Game logic only. No rendering. No hardware calls.
+    //
+    // The ONLY job regarding the render system is calling markDirty() on layers
+    // whose content has changed this frame. The engine works out which bands
+    // are affected automatically.
+    // ------------------------------------------------------------------------
     void update(float deltaTime) {
         _scrollFrameCounter++;
 
-        // Play Surface / Midground: 1 pixel per 2 frames
+        // Play surface scrolls 1px per 2 frames
         if (_scrollFrameCounter % 2 == 0) {
             _mgScrollX--;
             _fgScrollX--;
+            if (_layerGround)   _layerGround->markDirty();
+            if (_layerEntities) _layerEntities->markDirty();
         }
 
-        // Background Hills: 1 pixel per 8 frames
+        // Background scrolls 1px per 8 frames
         if (_scrollFrameCounter % 8 == 0) {
             _bgScrollX--;
+            if (_layerBg) _layerBg->markDirty();
         }
 
-        // Hero 8-frame animation: advance every 2 frames
+        // Hero animation advances every 2 frames
         _animFrameCounter++;
         if (_animFrameCounter >= 2) {
             _animFrameCounter = 0;
             _heroFrame = (_heroFrame + 1) % 8;
+            if (_layerEntities) _layerEntities->markDirty();
         }
 
-        // Increment score
+        // Score increments every frame
         _score = (_score + 1) % 100000;
-
-        // --- Update Dirty Flags ---
-        // Band 0 (Y=0..79):   Sky bg + HUD score → dirty if score or bgScroll changed
-        // Band 1 (Y=80..159): Sky bg + hero top  → dirty if bgScroll or heroFrame changed
-        // Band 2 (Y=160..239):Ground + hero feet + star → dirty if mgScroll or heroFrame changed
-        // Band 3 (Y=240..319):Ground only         → dirty if mgScroll changed
-
-        bool bgChanged   = (_bgScrollX != _lastBgScrollX);
-        bool mgChanged   = (_mgScrollX != _lastMgScrollX);
-        bool heroChanged = (_heroFrame  != _lastHeroFrame);
-        bool scoreChanged= (_score      != _lastScore);
-
-        _bandDirty[0] = bgChanged || scoreChanged;
-        _bandDirty[1] = bgChanged || heroChanged;
-        _bandDirty[2] = mgChanged || heroChanged;
-        _bandDirty[3] = mgChanged;
-
-        // Record last-rendered values
-        _lastBgScrollX = _bgScrollX;
-        _lastMgScrollX = _mgScrollX;
-        _lastHeroFrame = _heroFrame;
-        _lastScore     = _score;
+        if (_layerHUD) _layerHUD->markDirty();
     }
 
+    // ------------------------------------------------------------------------
+    // render() — Fully general. Zero scene-specific logic.
+    //
+    // 1. Ask LayerManager which bands are dirty (based on layer Y-ranges +
+    //    stateVersion counters — no hardcoded band/variable mapping).
+    // 2. Hand control to GFXContext::renderBands() which runs the DMA
+    //    double-buffer pipeline for all dirty bands.
+    // ------------------------------------------------------------------------
     void render(GFXContext& gfx) {
-        /**
-         * DMA Double-Buffering + Dirty-Rect Render Loop
-         *
-         * Algorithm:
-         *   Frame N has 4 bands (0..3). For each band:
-         *     - If dirty: render into the active sprite buffer
-         *     - If the PREVIOUS band was dirty (DMA in flight), wait for DMA, then
-         *       swap buffers and initiate DMA for the just-rendered band.
-         *     - If not dirty: skip both render and push entirely.
-         *
-         * The key overlap: while DMA transfers band[i], CPU renders band[i+1].
-         */
-        const int totalHeight = gfx.getHeight();   // 320
-        const int bandHeight  = 80;
-        const int numBands    = totalHeight / bandHeight; // 4
-
-        bool prevDirty   = false;  // Was the previous band dirty (i.e. is DMA in flight)?
-        int  prevBandY   = 0;      // bandY of the in-flight DMA transfer
-
-        for (int band = 0; band < numBands; band++) {
-            int bandY = band * bandHeight;
-
-            if (_bandDirty[band]) {
-                // --- Render phase: draw into active buffer ---
-                // (DMA for previous band may be running concurrently in hardware)
-                gfx.setBandY(bandY);
-                _layerManager.renderAll(gfx, gfx.getSprite());
-
-                // --- Wait for previous DMA to finish before touching the bus ---
-                if (prevDirty) {
-                    gfx.waitDMA();
-                }
-
-                // --- Push this band via DMA (non-blocking) ---
-                gfx.pushBufferDMA();
-
-                // --- Swap to the other buffer so next render doesn't clobber in-flight DMA ---
-                gfx.swapBuffer();
-
-                prevDirty = true;
-                prevBandY = bandY;
-            } else {
-                // This band is clean — if DMA is still running let it finish,
-                // but don't re-render or re-push this band at all.
-                if (prevDirty) {
-                    gfx.waitDMA();
-                    prevDirty = false;
-                }
-            }
-        }
-
-        // Final flush: wait for the last in-flight DMA if any
-        if (prevDirty) {
-            gfx.waitDMA();
-        }
+        bool bandDirty[LayerManager::MAX_BANDS] = {};
+        _layerManager.computeBandDirtyFlags(bandDirty, gfx.getNumBands(), gfx.getBandHeight());
+        gfx.renderBands(_layerManager, bandDirty);
     }
 };
 
