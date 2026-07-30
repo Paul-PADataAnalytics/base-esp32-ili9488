@@ -11,8 +11,10 @@
  * Realistic Side-Scroller Platformer Benchmark Application
  * 
  * Features:
- * - 6-Tile Atlas (Grass Top, Deep Dirt, Hill Crest, Hill Base, Hill Left Slope, Hill Right Slope)
- * - Seamless screen bottom fill eliminating corrupt edge gaps
+ * - Frame-rate tied scroll speeds:
+ *   * Play surface / Midground: 1 pixel per 2 frames
+ *   * Background Hills: 1 pixel per 8 frames
+ * - 512px Tilemap wrap (16 cols * 32px) for 100% butter-smooth seamless scrolling without jumps
  * - Hero runner aligned firmly to top of ground surface (Y = 176)
  * - Band-based layer culling for maximum FPS
  */
@@ -26,12 +28,13 @@ private:
     TileSet _hillsTileSet;
     TileMap _hillsMap;
 
-    float _bgScrollX; // Background parallax scroll position
-    float _mgScrollX; // Midground play surface scroll position
-    float _fgScrollX; // Foreground pickup item scroll position
+    int _bgScrollX; // Background parallax scroll position in integer pixels
+    int _mgScrollX; // Midground play surface scroll position in integer pixels
+    int _fgScrollX; // Foreground pickup item scroll position in integer pixels
 
     int _heroFrame;
-    int _frameCounter;
+    int _animFrameCounter;
+    int _scrollFrameCounter;
     int _score;
 
 public:
@@ -40,13 +43,13 @@ public:
           _dirtMap(&_dirtTileSet, PLAY_SURFACE_MAP, 16, 10),
           _hillsTileSet(DIRT_TILESET_32x32, 32, 32, 32, 192),
           _hillsMap(&_hillsTileSet, HILLS_BACKGROUND_MAP, 16, 10),
-          _bgScrollX(0.0f), _mgScrollX(0.0f), _fgScrollX(0.0f),
-          _heroFrame(0), _frameCounter(0), _score(0) {}
+          _bgScrollX(0), _mgScrollX(0), _fgScrollX(0),
+          _heroFrame(0), _animFrameCounter(0), _scrollFrameCounter(0), _score(0) {}
 
     void setup(GFXContext& gfx) {
         _layerManager.clearLayers();
 
-        // 1. Layer 0: Sky & Parallax Rolling Hills (Scroller 4 px/sec)
+        // 1. Layer 0: Sky & Parallax Rolling Hills (1 pixel per 8 frames)
         _layerManager.addLayer("BackgroundHills", LayerRole::BACKGROUND, 0, [this](GFXContext& gfx, LGFX_Sprite* buffer, Layer& layer) {
             int bandY = gfx.getBandY();
             // Cull Background layer if band is strictly below Y=192
@@ -55,20 +58,26 @@ public:
             // Fill sky blue color
             buffer->fillScreen(gfx.color565(135, 206, 235));
 
-            int offset = (int)_bgScrollX % 32;
+            // Seamless 512px map wrap (16 cols * 32px = 512px map width)
+            int offset = _bgScrollX % 512;
+            if (offset > 0) offset -= 512;
+
             _hillsMap.render(buffer, offset, 0, bandY, C_TRANS);
-            _hillsMap.render(buffer, offset + 480, 0, bandY, C_TRANS);
+            _hillsMap.render(buffer, offset + 512, 0, bandY, C_TRANS);
         });
 
-        // 2. Layer 1: Midground Play Surface Dirt & Grass Tiles (Scroller 8 px/sec)
+        // 2. Layer 1: Midground Play Surface Dirt & Grass Tiles (1 pixel per 2 frames)
         _layerManager.addLayer("PlaySurface", LayerRole::WORLD_MAP, 0, [this](GFXContext& gfx, LGFX_Sprite* buffer, Layer& layer) {
             int bandY = gfx.getBandY();
             // Cull Play Surface layer if band is strictly above Y=160
             if (bandY < 160) return;
 
-            int offset = (int)_mgScrollX % 32;
+            // Seamless 512px map wrap (16 cols * 32px = 512px map width)
+            int offset = _mgScrollX % 512;
+            if (offset > 0) offset -= 512;
+
             _dirtMap.render(buffer, offset, 0, bandY, 0xFFFF);
-            _dirtMap.render(buffer, offset + 480, 0, bandY, 0xFFFF);
+            _dirtMap.render(buffer, offset + 512, 0, bandY, 0xFFFF);
         });
 
         // 3. Layer 2: Animated Hero Runner & Floating Collectible Pickup Star
@@ -78,8 +87,8 @@ public:
             if (bandY < 80 || bandY >= 240) return;
 
             // A. Draw Floating Gold Star Pickup Item
-            int starX = 360 + ((int)_fgScrollX % 480);
-            if (starX < -16) starX += 480;
+            int starX = 360 + (_fgScrollX % 512);
+            if (starX < -16) starX += 512;
 
             // Draw pickup star using row blitting directly on buffer
             for (int sy = 0; sy < 16; sy++) {
@@ -142,19 +151,27 @@ public:
     }
 
     void update(float deltaTime) {
-        // Parallax Scrolling Motion
-        _bgScrollX -= 4.0f * deltaTime; // Background Hills at 4 px/sec
-        _mgScrollX -= 8.0f * deltaTime; // Midground Dirt at 8 px/sec
-        _fgScrollX -= 8.0f * deltaTime; // Floating Pickup Star at 8 px/sec
+        _scrollFrameCounter++;
 
-        // Hero Runner 8-frame Animation Timing (Updates frame every 2 game frames)
-        _frameCounter++;
-        if (_frameCounter >= 2) {
-            _frameCounter = 0;
+        // 1. Play Surface / Midground: 1 pixel per 2 frames
+        if (_scrollFrameCounter % 2 == 0) {
+            _mgScrollX--;
+            _fgScrollX--;
+        }
+
+        // 2. Background Hills: 1 pixel per 8 frames
+        if (_scrollFrameCounter % 8 == 0) {
+            _bgScrollX--;
+        }
+
+        // 3. Hero Runner 8-frame Animation Timing (Updates frame every 2 game frames)
+        _animFrameCounter++;
+        if (_animFrameCounter >= 2) {
+            _animFrameCounter = 0;
             _heroFrame = (_heroFrame + 1) % 8;
         }
 
-        // Increment 5-Digit Score Counter by 1 each frame
+        // 4. Increment 5-Digit Score Counter by 1 each frame
         _score = (_score + 1) % 100000;
     }
 
