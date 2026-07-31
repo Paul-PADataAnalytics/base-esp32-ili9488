@@ -1,7 +1,11 @@
 #ifndef LUA_DEMO_APP_H
 #define LUA_DEMO_APP_H
 
+#if defined(PLATFORM_LINUX) || !defined(ARDUINO)
+#include "Arduino_Linux.h"
+#else
 #include <Arduino.h>
+#endif
 #include "GFXContext.h"
 #include "LayerManager.h"
 #include "scripting/LuaEngine.h"

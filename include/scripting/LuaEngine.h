@@ -1,7 +1,11 @@
 #ifndef LUA_ENGINE_H
 #define LUA_ENGINE_H
 
+#if defined(PLATFORM_LINUX) || !defined(ARDUINO)
+#include "Arduino_Linux.h"
+#else
 #include <Arduino.h>
+#endif
 #include <map>
 #include <vector>
 

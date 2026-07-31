@@ -1,15 +1,17 @@
 #include "DisplayDriver.h"
 
+#if !defined(PLATFORM_LINUX) && defined(ARDUINO)
+
 LGFX_ILI9488::LGFX_ILI9488() {
     { // SPI Bus Configuration
         auto cfg = _bus_instance.config();
         cfg.spi_host   = VSPI_HOST;   // Use VSPI (SPI3) on ESP32
         cfg.spi_mode   = 0;
-        cfg.freq_write = 40000000;    // 40 MHz SPI write speed (Optimal hardware-stable maximum for ILI9488)
+        cfg.freq_write = 40000000;    // 40 MHz SPI write speed
         cfg.freq_read  = 16000000;
-        cfg.pin_sclk   = 18;          // SCK pin (LCD CLK & Touch TCK)
-        cfg.pin_mosi   = 23;          // MOSI pin (LCD SDI & Touch TDI)
-        cfg.pin_miso   = -1;          // LCD Write-Only (Prevents MISO bus contention from Touch TDO!)
+        cfg.pin_sclk   = 18;          // SCK pin
+        cfg.pin_mosi   = 23;          // MOSI pin
+        cfg.pin_miso   = -1;          // Write-only mode
         cfg.pin_dc     = 27;          // DC pin
         _bus_instance.config(cfg);
         _panel_instance.setBus(&_bus_instance);
@@ -26,31 +28,33 @@ LGFX_ILI9488::LGFX_ILI9488() {
         cfg.offset_y         = 0;
         cfg.offset_rotation  = 0;
         cfg.dummy_read_pixel = 8;
-        cfg.readable         = false; // Write-only mode prevents MISO stalls
+        cfg.readable         = false;
         cfg.invert           = false;
         cfg.rgb_order        = false;
         cfg.dlen_16bit       = false;
-        cfg.bus_shared       = true;  // Shares SPI bus with touch controller
+        cfg.bus_shared       = true;
         _panel_instance.config(cfg);
     }
 
-    { // Touch Controller Configuration (XPT2046 on Shared Bus)
+    { // Touch Controller Configuration (XPT2046)
         auto cfg = _touch_instance.config();
-        cfg.x_min      = 300;         // Direct X alignment (Left = D-Pad, Right = A/B Buttons)
+        cfg.x_min      = 300;
         cfg.x_max      = 3900;
-        cfg.y_min      = 3700;        // Inverted Y alignment (Bottom = Touch Controls)
+        cfg.y_min      = 3700;
         cfg.y_max      = 200;
-        cfg.pin_cs     = 33;          // TCS -> GPIO 33
-        cfg.pin_int    = 36;          // PEN -> GPIO 36
-        cfg.spi_host   = VSPI_HOST;   // Target VSPI_HOST explicitly
-        cfg.bus_shared = true;        // Inherits SPI bus from panel (VSPI_HOST)
-        cfg.freq       = 1000000;     // 1 MHz Touch SPI frequency
-        cfg.pin_sclk   = 18;          // TCK -> GPIO 18
-        cfg.pin_mosi   = 23;          // TDI -> GPIO 23
-        cfg.pin_miso   = 19;          // TDO -> GPIO 19
+        cfg.pin_cs     = 33;
+        cfg.pin_int    = 36;
+        cfg.spi_host   = VSPI_HOST;
+        cfg.bus_shared = true;
+        cfg.freq       = 1000000;
+        cfg.pin_sclk   = 18;
+        cfg.pin_mosi   = 23;
+        cfg.pin_miso   = 19;
         _touch_instance.config(cfg);
         _panel_instance.setTouch(&_touch_instance);
     }
 
     setPanel(&_panel_instance);
 }
+
+#endif

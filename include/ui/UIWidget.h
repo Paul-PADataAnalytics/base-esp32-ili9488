@@ -1,7 +1,11 @@
 #ifndef UI_WIDGET_H
 #define UI_WIDGET_H
 
+#if defined(PLATFORM_LINUX) || !defined(ARDUINO)
+#include "Arduino_Linux.h"
+#else
 #include <Arduino.h>
+#endif
 #include <LovyanGFX.hpp>
 #include <functional>
 #include "UITheme.h"

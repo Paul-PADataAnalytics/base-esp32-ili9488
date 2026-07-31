@@ -1,7 +1,11 @@
 #ifndef LAYER_MANAGER_H
 #define LAYER_MANAGER_H
 
+#if defined(PLATFORM_LINUX) || !defined(ARDUINO)
+#include "Arduino_Linux.h"
+#else
 #include <Arduino.h>
+#endif
 #include <LovyanGFX.hpp>
 #include <vector>
 #include <algorithm>

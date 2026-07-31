@@ -1,6 +1,4 @@
-/**
- * ESP32 Hardware-Abstracted Lua UI Game Benchmark & Framework Demonstration
- */
+#if !defined(PLATFORM_LINUX) && defined(ARDUINO)
 
 #include <Arduino.h>
 #include <LovyanGFX.hpp>
@@ -81,3 +79,5 @@ void loop() {
                       fps, renderUs, ESP.getFreeHeap());
     }
 }
+
+#endif // !PLATFORM_LINUX

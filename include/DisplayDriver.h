@@ -1,6 +1,8 @@
 #ifndef DISPLAY_DRIVER_H
 #define DISPLAY_DRIVER_H
 
+#if !defined(PLATFORM_LINUX) && defined(ARDUINO)
+
 #include <Arduino.h>
 #include <LovyanGFX.hpp>
 
@@ -15,5 +17,7 @@ class LGFX_ILI9488 : public lgfx::LGFX_Device {
 public:
     LGFX_ILI9488();
 };
+
+#endif
 
 #endif // DISPLAY_DRIVER_H
