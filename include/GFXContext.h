@@ -151,7 +151,11 @@ inline void GFXContext::renderBands(LayerManager& layerManager, const bool* band
 
         if (bandDirty[band]) {
             setBandY(bandY);
-            layerManager.renderAll(*this, getSprite());
+            LGFX_Sprite* s = getSprite();
+            if (s) {
+                s->setClipRect(0, 0, s->width(), s->height());
+            }
+            layerManager.renderAll(*this, s);
 
             if (prevDirty) waitDMA();
             pushBufferDMA();

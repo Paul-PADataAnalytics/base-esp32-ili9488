@@ -107,8 +107,7 @@ private:
         function update_stats_display()
             local hp = game.getVar("hp")
             local gold = game.getVar("gold")
-            -- Re-render stats banner
-            ui.createLabel(mainFrame, 15, 60, 430, 20, "HP: " .. math.floor(hp) .. " | Gold: " .. math.floor(gold))
+            ui.setText(statsLabel, "HP: " .. math.floor(hp) .. " | Gold: " .. math.floor(gold))
         end
 
         -- Initialize UI

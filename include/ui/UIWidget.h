@@ -55,6 +55,8 @@ public:
     UIWidget(int x, int y, int w, int h) : x(x), y(y), w(w), h(h) {}
     virtual ~UIWidget() = default;
 
+    virtual void setText(const char* text) {}
+
     // -------------------------------------------------------------------------
     // Subclass interface
     // -------------------------------------------------------------------------

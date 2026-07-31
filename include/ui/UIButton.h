@@ -43,6 +43,7 @@ public:
 
     // --- Configuration ---
     void setLabel(const char* label)     { _label = label; markDirty(); }
+    void setText(const char* text) override { setLabel(text); }
     void setDanger(bool danger)          { _danger = danger; markDirty(); }
     void setFont(const lgfx::IFont* f)   { _fontOverride = f; markDirty(); }
     void onPressed(Callback cb)          { _onPressed   = cb; }

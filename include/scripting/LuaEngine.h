@@ -3,40 +3,32 @@
 
 #if defined(PLATFORM_LINUX) || !defined(ARDUINO)
 #include "Arduino_Linux.h"
+extern "C" {
+#include <lua.h>
+#include <lualib.h>
+#include <lauxlib.h>
+}
 #else
 #include <Arduino.h>
-#endif
-#include <map>
-#include <vector>
-
 extern "C" {
 #include <lua/lua.h>
 #include <lua/lualib.h>
 #include <lua/lauxlib.h>
 }
+#endif
+#include <map>
+#include <vector>
 
 #include "../ui/UIManager.h"
 
 /**
  * LuaEngine — Embedded Lua 5.4 Scripting & UI Binding Layer
- *
- * Exposes the UI framework to Lua scripts:
- *   - ui.createLabel(parent_frame, x, y, w, h, text)
- *   - ui.createButton(parent_frame, x, y, w, h, text, lua_func_name)
- *   - ui.createCheckBox(parent_frame, x, y, w, h, text, initial_val, lua_func_name)
- *   - ui.createSlider(parent_frame, x, y, w, h, text, min, max, initial_val, lua_func_name)
- *   - ui.createOptionSelector(parent_frame, x, y, w, h, text, options_tbl, lua_func_name)
- *   - ui.createFrame(x, y, w, h, title)
- *   - ui.showToast(msg, color_hex, duration)
- *   - ui.clear()
- *   - game.getVar(name), game.setVar(name, val)
  */
 class LuaEngine {
 private:
     lua_State* _luaState = nullptr;
     UIManager* _uiManager = nullptr;
 
-    // Allocated UI widgets managed for Lua lifetime
     std::vector<UIWidget*> _allocatedWidgets;
     std::map<String, float> _gameVars;
 
@@ -110,7 +102,9 @@ public:
     }
 
     void setGameVar(const char* name, float val) {
-        _gameVars[name] = val;
+        if (!name) return;
+        String key = name;
+        _gameVars[key] = val;
         if (_luaState) {
             lua_pushnumber(_luaState, val);
             lua_setglobal(_luaState, name);
@@ -118,15 +112,14 @@ public:
     }
 
     float getGameVar(const char* name) {
-        if (_gameVars.find(name) != _gameVars.end()) {
-            return _gameVars[name];
-        }
-        return 0.0f;
+        if (!name) return 0.0f;
+        String key = name;
+        auto it = _gameVars.find(key);
+        return (it != _gameVars.end()) ? it->second : 0.0f;
     }
 
 private:
     void registerBindings() {
-        // Register 'ui' table functions
         lua_newtable(_luaState);
 
         lua_pushcfunction(_luaState, l_createFrame);
@@ -150,12 +143,14 @@ private:
         lua_pushcfunction(_luaState, l_showToast);
         lua_setfield(_luaState, -2, "showToast");
 
+        lua_pushcfunction(_luaState, l_setText);
+        lua_setfield(_luaState, -2, "setText");
+
         lua_pushcfunction(_luaState, l_clear);
         lua_setfield(_luaState, -2, "clear");
 
         lua_setglobal(_luaState, "ui");
 
-        // Register 'game' table functions
         lua_newtable(_luaState);
 
         lua_pushcfunction(_luaState, l_getVar);
@@ -166,8 +161,6 @@ private:
 
         lua_setglobal(_luaState, "game");
     }
-
-    // --- C Bridge Functions for Lua ---
 
     static int l_createFrame(lua_State* L) {
         int x = (int)luaL_checkinteger(L, 1);
@@ -255,6 +248,16 @@ private:
         return 1;
     }
 
+    inline static float getLuaFloat(lua_State* L, int idx, float defaultVal = 0.0f) {
+        if (!L || idx > lua_gettop(L)) return defaultVal;
+        if (lua_isinteger(L, idx)) {
+            return static_cast<float>(lua_tointeger(L, idx));
+        } else if (lua_isnumber(L, idx)) {
+            return static_cast<float>(lua_tonumber(L, idx));
+        }
+        return defaultVal;
+    }
+
     static int l_createSlider(lua_State* L) {
         UIFrame* parent = (UIFrame*)lua_touserdata(L, 1);
         int x = (int)luaL_checkinteger(L, 2);
@@ -262,9 +265,10 @@ private:
         int w = (int)luaL_checkinteger(L, 4);
         int h = (int)luaL_checkinteger(L, 5);
         const char* labelStr = luaL_checkstring(L, 6);
-        float minV = (float)luaL_checknumber(L, 7);
-        float maxV = (float)luaL_checknumber(L, 8);
-        float initV = (float)luaL_checknumber(L, 9);
+
+        float minV  = getLuaFloat(L, 7, 0.0f);
+        float maxV  = getLuaFloat(L, 8, 1.0f);
+        float initV = getLuaFloat(L, 9, 0.5f);
         const char* funcName = luaL_optstring(L, 10, nullptr);
 
         UISlider* slider = new UISlider(x, y, w, h, labelStr, minV, maxV, initV);
@@ -330,6 +334,15 @@ private:
         return 0;
     }
 
+    static int l_setText(lua_State* L) {
+        UIWidget* w = (UIWidget*)lua_touserdata(L, 1);
+        const char* text = luaL_checkstring(L, 2);
+        if (w && text) {
+            w->setText(text);
+        }
+        return 0;
+    }
+
     static int l_clear(lua_State* L) {
         s_instance->_uiManager->clear();
         for (auto* w : s_instance->_allocatedWidgets) {
@@ -353,7 +366,6 @@ private:
     }
 };
 
-// Static member definition
 LuaEngine* LuaEngine::s_instance = nullptr;
 
 #endif // LUA_ENGINE_H

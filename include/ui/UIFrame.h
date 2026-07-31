@@ -29,6 +29,8 @@ public:
         markDirty();
     }
 
+    void setText(const char* text) override { setTitle(text); }
+
     void add(UIWidget* child) {
         if (child) {
             _children.push_back(child);
