@@ -84,6 +84,14 @@ public:
     /** Touch drag event (canvas-absolute tx, ty). */
     virtual bool onTouchDrag(int16_t tx, int16_t ty) { return false; }
 
+    /** Serialize widget state to JSON for AI agent inspection. */
+    virtual String toJson() const {
+        char buf[128];
+        snprintf(buf, sizeof(buf), "{\"type\":\"widget\",\"x\":%d,\"y\":%d,\"w\":%d,\"h\":%d,\"visible\":%s,\"enabled\":%s}",
+                 x, y, w, h, visible ? "true" : "false", enabled ? "true" : "false");
+        return String(buf);
+    }
+
     // -------------------------------------------------------------------------
     // Dirty State
     // -------------------------------------------------------------------------

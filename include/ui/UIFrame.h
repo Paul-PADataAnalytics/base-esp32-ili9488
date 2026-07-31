@@ -45,6 +45,21 @@ public:
         markDirty();
     }
 
+    String toJson() const override {
+        char buf[256];
+        snprintf(buf, sizeof(buf), "{\"type\":\"frame\",\"x\":%d,\"y\":%d,\"w\":%d,\"h\":%d,\"title\":\"%s\",\"children\":[",
+                 x, y, w, h, _title.c_str());
+        String json = buf;
+        for (size_t i = 0; i < _children.size(); i++) {
+            if (_children[i]) {
+                json += _children[i]->toJson();
+                if (i < _children.size() - 1) json += ",";
+            }
+        }
+        json += "]}";
+        return json;
+    }
+
     void update(float deltaTime) override {
         for (auto* child : _children) {
             if (child->visible) {

@@ -58,6 +58,19 @@ public:
         _focusedWidget = nullptr;
     }
 
+    String dumpUIJson() const {
+        String json = "{\n  \"widgets\": [\n";
+        for (size_t i = 0; i < _widgets.size(); i++) {
+            if (_widgets[i]) {
+                json += "    " + _widgets[i]->toJson();
+                if (i < _widgets.size() - 1) json += ",";
+                json += "\n";
+            }
+        }
+        json += "  ]\n}";
+        return json;
+    }
+
     void markAllDirty() {
         for (auto* w : _widgets) {
             if (w) w->onTouchRelease(-1, -1);

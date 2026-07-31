@@ -50,6 +50,13 @@ public:
 
     const char* getLabel() const { return _label.c_str(); }
 
+    String toJson() const override {
+        char buf[256];
+        snprintf(buf, sizeof(buf), "{\"type\":\"button\",\"x\":%d,\"y\":%d,\"w\":%d,\"h\":%d,\"label\":\"%s\",\"pressed\":%s,\"enabled\":%s}",
+                 x, y, w, h, _label.c_str(), _pressed ? "true" : "false", enabled ? "true" : "false");
+        return String(buf);
+    }
+
     // --- Update (long-press timer) ---
     void update(float deltaTime) override {
         if (_pressed && _onLongPress && !_longPressFired) {

@@ -53,6 +53,13 @@ public:
         return "";
     }
 
+    String toJson() const override {
+        char buf[256];
+        snprintf(buf, sizeof(buf), "{\"type\":\"option_selector\",\"x\":%d,\"y\":%d,\"w\":%d,\"h\":%d,\"label\":\"%s\",\"selected\":%d,\"selectedOption\":\"%s\",\"enabled\":%s}",
+                 x, y, w, h, _label.c_str(), _selectedIndex, getSelectedOption(), enabled ? "true" : "false");
+        return String(buf);
+    }
+
     void onChanged(ChangeCallback cb) { _onChange = cb; }
 
     void bindTo(int* valPtr) {

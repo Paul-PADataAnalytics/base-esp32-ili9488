@@ -118,6 +118,9 @@ private:
 public:
     LuaDemoApp() {}
 
+    LuaEngine& getLuaEngine() { return _lua; }
+    UIManager& getUIManager() { return _uiManager; }
+
     void setup(GFXContext& gfx) {
         _layerManager.clearLayers();
         _uiManager.setTheme(UITheme_Dark());

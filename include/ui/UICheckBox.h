@@ -68,6 +68,13 @@ public:
 
     bool isChecked() const { return _checked; }
 
+    String toJson() const override {
+        char buf[256];
+        snprintf(buf, sizeof(buf), "{\"type\":\"checkbox\",\"x\":%d,\"y\":%d,\"w\":%d,\"h\":%d,\"label\":\"%s\",\"checked\":%s,\"enabled\":%s}",
+                 x, y, w, h, _label.c_str(), _checked ? "true" : "false", enabled ? "true" : "false");
+        return String(buf);
+    }
+
     // --- Draw ---
     void draw(LGFX_Sprite* buf, int bandY, int bandH, const UITheme& theme) override {
         if (!visible || !buf || !overlapsBand(bandY, bandH)) return;

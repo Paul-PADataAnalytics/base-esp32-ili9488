@@ -61,6 +61,13 @@ public:
 
     const char* getText() const { return _text.c_str(); }
 
+    String toJson() const override {
+        char buf[256];
+        snprintf(buf, sizeof(buf), "{\"type\":\"label\",\"x\":%d,\"y\":%d,\"w\":%d,\"h\":%d,\"text\":\"%s\"}",
+                 x, y, w, h, _text.c_str());
+        return String(buf);
+    }
+
     // --- Draw ---
 
     void draw(LGFX_Sprite* buf, int bandY, int bandH, const UITheme& theme) override {

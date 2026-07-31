@@ -8,10 +8,11 @@
 #include <cstdio>
 
 /**
- * HALDisplay_Linux — Native SDL2 Desktop Simulator HAL
+ * HALDisplay_Linux — Native SDL2 Desktop & Agent Inspection Simulator HAL
  *
- * Runs the ESP32 game engine inside a native 960x640 desktop window (2x scaled 480x320 canvas).
- * Maps mouse clicks and drags to touch coordinates.
+ * Runs the ESP32 game engine inside a native 960x640 desktop window (2x scaled 480x320 canvas),
+ * or headlessly for background AI code generation and automated testing.
+ * Supports PPM image screenshot export and programmatic touch event injection.
  */
 class HALDisplay_Linux : public HALDisplay {
 private:
@@ -20,12 +21,13 @@ private:
     SDL_Texture*  _texture  = nullptr;
 
     uint16_t* _framebuffer = nullptr;
-    int _width  = 480;
-    int _height = 320;
-    int _scale  = 2; // 2x window scaling (960x640)
+    int _width    = 480;
+    int _height   = 320;
+    int _scale    = 2; // 2x window scaling (960x640)
 
     bool _running    = false;
     bool _isTouched  = false;
+    bool _headless   = false;
     int  _touchX     = 0;
     int  _touchY     = 0;
 
@@ -37,10 +39,23 @@ public:
         cleanup();
     }
 
+    void setHeadless(bool headless) { _headless = headless; }
+    bool isHeadless() const { return _headless; }
+
     bool init() override {
+        _framebuffer = new uint16_t[_width * _height];
+        memset(_framebuffer, 0, _width * _height * sizeof(uint16_t));
+        _running = true;
+
+        if (_headless) {
+            printf("[HAL LINUX] Running in HEADLESS mode (in-memory framebuffer, no GUI window).\n");
+            return true;
+        }
+
         if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) < 0) {
-            printf("[HAL LINUX ERROR] SDL_Init failed: %s\n", SDL_GetError());
-            return false;
+            printf("[HAL LINUX WARNING] SDL_Init failed: %s. Falling back to headless mode.\n", SDL_GetError());
+            _headless = true;
+            return true;
         }
 
         _window = SDL_CreateWindow(
@@ -51,8 +66,9 @@ public:
         );
 
         if (!_window) {
-            printf("[HAL LINUX ERROR] SDL_CreateWindow failed: %s\n", SDL_GetError());
-            return false;
+            printf("[HAL LINUX WARNING] SDL_CreateWindow failed. Falling back to headless mode.\n");
+            _headless = true;
+            return true;
         }
 
         _renderer = SDL_CreateRenderer(_window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
@@ -67,18 +83,12 @@ public:
             _width, _height
         );
 
-        _framebuffer = new uint16_t[_width * _height];
-        memset(_framebuffer, 0, _width * _height * sizeof(uint16_t));
-
-        _running = true;
         printf("[HAL LINUX] Native SDL2 Desktop Window initialized (%dx%d canvas, %dx scaling).\n",
                _width, _height, _scale);
         return true;
     }
 
-    void setRotation(uint8_t rotation) override {
-        // Landscape 480x320 is default
-    }
+    void setRotation(uint8_t rotation) override {}
 
     void fillScreen(uint16_t color) override {
         if (!_framebuffer) return;
@@ -98,7 +108,20 @@ public:
         return _isTouched;
     }
 
+    // Programmatic Touch Injection APIs for AI Agents & Automated Tests
+    void injectTouchPress(int x, int y) {
+        _touchX = x;
+        _touchY = y;
+        _isTouched = true;
+    }
+
+    void injectTouchRelease() {
+        _isTouched = false;
+    }
+
     void pollEvents() override {
+        if (_headless || !_window) return;
+
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
             switch (event.type) {
@@ -158,8 +181,29 @@ public:
         present();
     }
 
+    /** Export active framebuffer as binary PPM image file (P6 RGB888 format). */
+    bool savePPM(const char* filepath) const {
+        if (!_framebuffer || !filepath) return false;
+        FILE* f = fopen(filepath, "wb");
+        if (!f) return false;
+
+        fprintf(f, "P6\n%d %d\n255\n", _width, _height);
+        for (int i = 0; i < _width * _height; i++) {
+            uint16_t rgb565 = _framebuffer[i];
+            uint8_t r = ((rgb565 >> 11) & 0x1F) * 255 / 31;
+            uint8_t g = ((rgb565 >> 5) & 0x3F) * 255 / 63;
+            uint8_t b = (rgb565 & 0x1F) * 255 / 31;
+            fputc(r, f);
+            fputc(g, f);
+            fputc(b, f);
+        }
+        fclose(f);
+        return true;
+    }
+
 private:
     void updateTouchPos(int winX, int winY) {
+        if (!_window) return;
         int winW, winH;
         SDL_GetWindowSize(_window, &winW, &winH);
         _touchX = (int)((float)winX / winW * _width);
@@ -171,7 +215,7 @@ private:
     }
 
     void present() {
-        if (!_renderer || !_texture || !_framebuffer) return;
+        if (_headless || !_renderer || !_texture || !_framebuffer) return;
         SDL_UpdateTexture(_texture, nullptr, _framebuffer, _width * sizeof(uint16_t));
         SDL_RenderClear(_renderer);
         SDL_RenderCopy(_renderer, _texture, nullptr, nullptr);
@@ -183,7 +227,7 @@ private:
         if (_texture) { SDL_DestroyTexture(_texture); _texture = nullptr; }
         if (_renderer) { SDL_DestroyRenderer(_renderer); _renderer = nullptr; }
         if (_window) { SDL_DestroyWindow(_window); _window = nullptr; }
-        SDL_Quit();
+        if (!_headless) SDL_Quit();
     }
 };
 
