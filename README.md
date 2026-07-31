@@ -30,8 +30,9 @@ cd base-esp32-ili9488
 
 ## 🛠️ CLI Development Commands
 
-- **Build Firmware**: `pio run`
-- **Flash ESP32**: `pio run --target upload`
+- **Run Native Linux Simulator**: `./run_native.sh` (or `pio run -e desktop_linux`)
+- **Build ESP32 Firmware**: `pio run`
+- **Flash ESP32 Hardware**: `pio run --target upload`
 - **Serial Monitor**: `python3 monitor.py`
 - **Convert TTF Font**: `./venv/bin/python tools/font_converter.py MyFont.ttf 16 > include/fonts/MyFont16pt.h`
 
